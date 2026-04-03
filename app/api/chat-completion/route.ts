@@ -1,17 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { resolveAICopilotRuntimeConfig, toChatCompletionsUrl } from '@/app/api/config/route';
+import { resolveCompletionRuntimeConfig, toChatCompletionsUrl } from '@/lib/server/completion-config';
 
-interface CopilotPayload {
+interface ChatCompletionPayload {
   task: 'generate_layout' | 'html_block';
   prompt: string;
   currentContext?: unknown;
 }
 
 export async function POST(req: NextRequest) {
-  // 鉴权由 middleware.ts 处理
-  let body: CopilotPayload;
+  let body: ChatCompletionPayload;
   try {
-    body = (await req.json()) as CopilotPayload;
+    body = (await req.json()) as ChatCompletionPayload;
   } catch {
     return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
   }
@@ -20,7 +19,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Missing task or prompt' }, { status: 400 });
   }
 
-  const { baseUrl, apiKey, model } = resolveAICopilotRuntimeConfig();
+  const { baseUrl, apiKey, model } = resolveCompletionRuntimeConfig();
 
   if (!baseUrl) {
     return NextResponse.json({ error: 'AI Base URL 未配置' }, { status: 400 });
@@ -70,17 +69,17 @@ User request: ${body.prompt}`
 
     if (!upstream.ok) {
       const errText = await upstream.text();
-      console.error('[POST /api/ai/copilot] upstream error:', errText);
+      console.error('[POST /api/chat-completion] upstream error:', errText);
       return NextResponse.json({ error: 'AI API error' }, { status: 502 });
     }
 
-    const result = await upstream.json() as {
+    const result = (await upstream.json()) as {
       choices: Array<{ message: { content: string } }>;
     };
     const content = result.choices?.[0]?.message?.content ?? '';
     return NextResponse.json({ result: content });
   } catch (err) {
-    console.error('[POST /api/ai/copilot] fetch error:', err);
+    console.error('[POST /api/chat-completion] fetch error:', err);
     return NextResponse.json({ error: 'Failed to call AI API' }, { status: 502 });
   }
 }

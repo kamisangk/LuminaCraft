@@ -4,6 +4,7 @@ import { CSSProperties, useCallback, useEffect, useRef, useState } from 'react';
 import { ResponsiveGrid } from '@/components/layout/ResponsiveGrid';
 import { ModuleConfigPanel } from '@/components/panels/ModuleConfigPanel';
 import { ModuleLibraryPanel } from '@/components/panels/ModuleLibraryPanel';
+import { ChatCompletionPanel } from '@/components/panels/ChatCompletionPanel';
 import { SitePanel, BackgroundPanel } from '@/components/panels/SitePanel';
 import { LoginModal } from '@/components/LoginModal';
 import { useAppStore, PageConfig } from '@/store/useAppStore';
@@ -34,7 +35,7 @@ export default function HomePage() {
     setAuthenticated,
     toggleModuleLibrary,
     closeBackgroundPanel,
-    closeAiCopilot,
+    closeChatCompletion,
     toggleSitePanel,
     closeSitePanel,
     toggleBackgroundPanel,
@@ -49,15 +50,15 @@ export default function HomePage() {
 
   const openSitePanel = useCallback(() => {
     closeBackgroundPanel();
-    closeAiCopilot();
+    closeChatCompletion();
     toggleSitePanel();
-  }, [closeAiCopilot, closeBackgroundPanel, toggleSitePanel]);
+  }, [closeChatCompletion, closeBackgroundPanel, toggleSitePanel]);
 
   const openBackgroundPanel = useCallback(() => {
     closeSitePanel();
-    closeAiCopilot();
+    closeChatCompletion();
     toggleBackgroundPanel();
-  }, [closeAiCopilot, closeSitePanel, toggleBackgroundPanel]);
+  }, [closeChatCompletion, closeSitePanel, toggleBackgroundPanel]);
 
   const handleEditModeToggle = useCallback(() => {
     if (isEditMode) {
@@ -195,6 +196,7 @@ export default function HomePage() {
 
       <ModuleConfigPanel />
       <ModuleLibraryPanel />
+      <ChatCompletionPanel />
       <SitePanel />
       <BackgroundPanel />
 

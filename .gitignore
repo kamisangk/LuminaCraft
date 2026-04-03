@@ -32,6 +32,7 @@
 /temp/
 /data/config.json
 /data/auth.json
+/data/completion-config.json
 
 # debug
 npm-debug.log*

@@ -1,36 +1,36 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { readFileSync, writeFileSync } from 'fs';
+import { mkdirSync, readFileSync, writeFileSync } from 'fs';
 import { join } from 'path';
-import type { AICopilotConfig, PageConfig } from '@/store/useAppStore';
+import type { ChatCompletionConfig, PageConfig } from '@/store/useAppStore';
 
 const CONFIG_PATH = join(process.cwd(), 'data', 'config.json');
 
-type StoredAICopilotConfig = AICopilotConfig & {
+type LegacyCompletionConfig = ChatCompletionConfig & {
   apiKey?: string;
 };
 
-type StoredPageConfig = Omit<PageConfig, 'aiCopilot'> & {
-  aiCopilot?: StoredAICopilotConfig;
+type StoredPageConfig = Omit<PageConfig, 'chatCompletion'> & {
+  chatCompletion?: ChatCompletionConfig;
+  aiCopilot?: LegacyCompletionConfig;
 };
 
-const DEFAULT_AI_COPILOT_CONFIG: AICopilotConfig = {
+const DEFAULT_CHAT_COMPLETION_CONFIG: ChatCompletionConfig = {
   baseUrl: '',
   model: '',
   hasApiKey: false,
 };
 
-function normalizeStoredAICopilotConfig(config?: StoredAICopilotConfig | null): StoredAICopilotConfig {
+function normalizeStoredChatCompletionConfig(
+  config?: Partial<ChatCompletionConfig> | LegacyCompletionConfig | null
+): ChatCompletionConfig {
   if (!config || typeof config !== 'object') {
-    return { ...DEFAULT_AI_COPILOT_CONFIG };
+    return { ...DEFAULT_CHAT_COMPLETION_CONFIG };
   }
 
-  const apiKey = typeof config.apiKey === 'string' ? config.apiKey.trim() : '';
-
   return {
-    baseUrl: typeof config.baseUrl === 'string' ? config.baseUrl : DEFAULT_AI_COPILOT_CONFIG.baseUrl,
-    model: typeof config.model === 'string' ? config.model : DEFAULT_AI_COPILOT_CONFIG.model,
-    hasApiKey: apiKey.length > 0,
-    ...(apiKey ? { apiKey } : {}),
+    baseUrl: typeof config.baseUrl === 'string' ? config.baseUrl : DEFAULT_CHAT_COMPLETION_CONFIG.baseUrl,
+    model: typeof config.model === 'string' ? config.model : DEFAULT_CHAT_COMPLETION_CONFIG.model,
+    hasApiKey: typeof config.hasApiKey === 'boolean' ? config.hasApiKey : DEFAULT_CHAT_COMPLETION_CONFIG.hasApiKey,
   };
 }
 
@@ -40,31 +40,19 @@ function loadConfig(): StoredPageConfig | null {
     const parsed = JSON.parse(raw) as StoredPageConfig;
     return {
       ...parsed,
-      aiCopilot: normalizeStoredAICopilotConfig(parsed.aiCopilot),
+      chatCompletion: normalizeStoredChatCompletionConfig(parsed.chatCompletion ?? parsed.aiCopilot),
     };
   } catch {
-    // fall through
+    return null;
   }
-
-  return null;
-}
-
-function sanitizeAICopilotConfig(config?: StoredAICopilotConfig | null): AICopilotConfig {
-  const normalized = normalizeStoredAICopilotConfig(config);
-  return {
-    baseUrl: normalized.baseUrl,
-    model: normalized.model,
-    hasApiKey: normalized.hasApiKey,
-  };
 }
 
 function sanitizeConfig(config: StoredPageConfig): PageConfig {
   return {
     ...config,
-    aiCopilot: sanitizeAICopilotConfig(config.aiCopilot),
+    chatCompletion: normalizeStoredChatCompletionConfig(config.chatCompletion ?? config.aiCopilot),
     modules: config.modules.map((m) => {
       if (!m.props.pluginSettings) return m;
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
       const { token: _t, cookie: _c, secret: _s, apiKey: _ak, api_key: _a, accessToken: _at, ...safeSettings } =
         m.props.pluginSettings as Record<string, unknown>;
       return { ...m, props: { ...m.props, pluginSettings: safeSettings } };
@@ -73,41 +61,18 @@ function sanitizeConfig(config: StoredPageConfig): PageConfig {
 }
 
 function mergeStoredConfig(body: PageConfig, existingConfig: StoredPageConfig | null): StoredPageConfig {
-  const currentAi = normalizeStoredAICopilotConfig(existingConfig?.aiCopilot);
-  const incomingAi = body.aiCopilot as AICopilotConfig & { apiKey?: string };
-  const nextApiKey = typeof incomingAi?.apiKey === 'string' ? incomingAi.apiKey.trim() : '';
+  const nextChatCompletion = normalizeStoredChatCompletionConfig(
+    body.chatCompletion ?? existingConfig?.chatCompletion ?? existingConfig?.aiCopilot
+  );
 
   return {
     ...body,
-    aiCopilot: {
-      baseUrl: typeof incomingAi?.baseUrl === 'string' ? incomingAi.baseUrl : currentAi.baseUrl,
-      model: typeof incomingAi?.model === 'string' ? incomingAi.model : currentAi.model,
-      hasApiKey: nextApiKey ? true : currentAi.hasApiKey,
-      ...((nextApiKey ? nextApiKey : currentAi.apiKey) ? { apiKey: nextApiKey || currentAi.apiKey } : {}),
-    },
+    chatCompletion: nextChatCompletion,
   };
 }
 
 function isValidPageConfigBody(body: Partial<PageConfig>): body is PageConfig {
-  return Boolean(body.version && body.layouts && body.modules && body.site && body.aiCopilot);
-}
-
-export function getStoredAICopilotConfig(): StoredAICopilotConfig {
-  return normalizeStoredAICopilotConfig(loadConfig()?.aiCopilot);
-}
-
-export function resolveAICopilotRuntimeConfig(): { baseUrl: string; apiKey: string; model: string } {
-  const stored = getStoredAICopilotConfig();
-
-  return {
-    baseUrl: stored.baseUrl || process.env.LUMINA_AI_BASE_URL || 'https://api.openai.com/v1',
-    apiKey: stored.apiKey || process.env.LUMINA_AI_API_KEY || '',
-    model: stored.model || process.env.LUMINA_AI_MODEL || 'gpt-4o-mini',
-  };
-}
-
-export function toChatCompletionsUrl(baseUrl: string): string {
-  return `${baseUrl.replace(/\/+$/, '')}/chat/completions`;
+  return Boolean(body.version && body.layouts && body.modules && body.site && body.chatCompletion);
 }
 
 export async function GET() {
@@ -131,7 +96,6 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const { mkdirSync } = await import('fs');
     mkdirSync(join(process.cwd(), 'data'), { recursive: true });
     const merged = mergeStoredConfig(body, loadConfig());
     writeFileSync(CONFIG_PATH, JSON.stringify(merged, null, 2), 'utf-8');

@@ -5,16 +5,16 @@ import { useAppStore } from '@/store/useAppStore';
 
 type Task = 'generate_layout' | 'html_block';
 
-export function AICopilotPanel() {
-  const isOpen = useAppStore((s) => s.isAiCopilotOpen);
-  const closeAiCopilot = useAppStore((s) => s.closeAiCopilot);
+export function ChatCompletionPanel() {
+  const isOpen = useAppStore((s) => s.isChatCompletionOpen);
+  const closeChatCompletion = useAppStore((s) => s.closeChatCompletion);
   const pageConfig = useAppStore((s) => s.pageConfig);
   const updateLayouts = useAppStore((s) => s.updateLayouts);
   const updateModuleProps = useAppStore((s) => s.updateModuleProps);
   const addModule = useAppStore((s) => s.addModule);
   const openModulePanel = useAppStore((s) => s.openModulePanel);
   const activePanelModuleId = useAppStore((s) => s.activePanelModuleId);
-  const updateAICopilotConfig = useAppStore((s) => s.updateAICopilotConfig);
+  const updateChatCompletionConfig = useAppStore((s) => s.updateChatCompletionConfig);
 
   const [task, setTask] = useState<Task>('generate_layout');
   const [prompt, setPrompt] = useState('');
@@ -23,14 +23,14 @@ export function AICopilotPanel() {
   const [result, setResult] = useState('');
   const [error, setError] = useState('');
   const [configStatus, setConfigStatus] = useState('');
-  const [baseUrl, setBaseUrl] = useState(pageConfig.aiCopilot.baseUrl);
-  const [model, setModel] = useState(pageConfig.aiCopilot.model);
+  const [baseUrl, setBaseUrl] = useState(pageConfig.chatCompletion.baseUrl);
+  const [model, setModel] = useState(pageConfig.chatCompletion.model);
   const [apiKey, setApiKey] = useState('');
 
   useEffect(() => {
-    setBaseUrl(pageConfig.aiCopilot.baseUrl);
-    setModel(pageConfig.aiCopilot.model);
-  }, [pageConfig.aiCopilot.baseUrl, pageConfig.aiCopilot.model]);
+    setBaseUrl(pageConfig.chatCompletion.baseUrl);
+    setModel(pageConfig.chatCompletion.model);
+  }, [pageConfig.chatCompletion.baseUrl, pageConfig.chatCompletion.model]);
 
   const targetHtmlModule = useMemo(() => {
     const selected = pageConfig.modules.find((m) => m.id === activePanelModuleId && m.type === 'html_block');
@@ -48,18 +48,13 @@ export function AICopilotPanel() {
     const nextApiKey = apiKey.trim();
 
     try {
-      const res = await fetch('/api/config', {
+      const res = await fetch('/api/completion-config', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'x-lumina-owner': 'local' },
         body: JSON.stringify({
-          ...pageConfig,
-          aiCopilot: {
-            ...pageConfig.aiCopilot,
-            baseUrl: nextBaseUrl,
-            model: nextModel,
-            hasApiKey: pageConfig.aiCopilot.hasApiKey || Boolean(nextApiKey),
-            ...(nextApiKey ? { apiKey: nextApiKey } : {}),
-          },
+          baseUrl: nextBaseUrl,
+          model: nextModel,
+          ...(nextApiKey ? { apiKey: nextApiKey } : {}),
         }),
       });
 
@@ -73,13 +68,14 @@ export function AICopilotPanel() {
         return;
       }
 
-      updateAICopilotConfig({
+      const data = (await res.json().catch(() => null)) as { hasApiKey?: boolean } | null;
+      updateChatCompletionConfig({
         baseUrl: nextBaseUrl,
         model: nextModel,
-        hasApiKey: pageConfig.aiCopilot.hasApiKey || Boolean(nextApiKey),
+        hasApiKey: Boolean(data?.hasApiKey),
       });
       setApiKey('');
-      setConfigStatus(nextApiKey ? 'AI 接口配置已保存，API Key 已更新。' : 'AI 接口配置已保存。');
+      setConfigStatus(nextApiKey ? '接口配置已保存，API Key 已更新。' : '接口配置已保存。');
     } catch {
       setError('配置保存失败，请检查连接。');
     } finally {
@@ -94,7 +90,7 @@ export function AICopilotPanel() {
     setResult('');
 
     try {
-      const res = await fetch('/api/ai/copilot', {
+      const res = await fetch('/api/chat-completion', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -175,12 +171,7 @@ export function AICopilotPanel() {
 
   return (
     <>
-      {isOpen && (
-        <div
-          className="fixed inset-0 z-40 bg-black/30 backdrop-blur-[2px]"
-          onClick={closeAiCopilot}
-        />
-      )}
+      {isOpen && <div className="fixed inset-0 z-40 bg-black/30 backdrop-blur-[2px]" onClick={closeChatCompletion} />}
 
       <div
         className={`fixed top-0 right-0 z-50 h-full w-80 flex flex-col transition-transform duration-300 ease-in-out ${
@@ -200,11 +191,11 @@ export function AICopilotPanel() {
           <div>
             <p className="text-xs opacity-40" style={{ color: 'var(--color-text)' }}>AI 辅助</p>
             <h3 className="text-sm font-semibold mt-0.5" style={{ color: 'var(--color-text)' }}>
-              AI Copilot
+              Chat Completion
             </h3>
           </div>
           <button
-            onClick={closeAiCopilot}
+            onClick={closeChatCompletion}
             className="w-8 h-8 rounded-lg flex items-center justify-center text-white/40 hover:text-white/80 hover:bg-white/5 transition-colors"
             aria-label="关闭"
           >
@@ -255,13 +246,13 @@ export function AICopilotPanel() {
                 type="password"
                 value={apiKey}
                 onChange={(e) => setApiKey(e.target.value)}
-                placeholder={pageConfig.aiCopilot.hasApiKey ? '已保存，留空则保持不变' : '输入新的 API Key'}
+                placeholder={pageConfig.chatCompletion.hasApiKey ? '已保存，留空则保持不变' : '输入新的 API Key'}
                 className="w-full rounded-lg px-3 py-2 text-xs outline-none bg-white/5 border border-white/10 focus:border-purple-400/60 transition-colors"
                 style={{ color: 'var(--color-text)' }}
               />
             </label>
 
-            {pageConfig.aiCopilot.hasApiKey && (
+            {pageConfig.chatCompletion.hasApiKey && (
               <p className="text-[11px] leading-relaxed text-emerald-400/80">当前已保存 API Key，输入新值可覆盖。</p>
             )}
 
@@ -273,9 +264,7 @@ export function AICopilotPanel() {
               {savingConfig ? '保存中…' : '保存接口配置'}
             </button>
 
-            {configStatus && (
-              <p className="text-xs text-emerald-400 bg-emerald-400/10 rounded-lg px-3 py-2">{configStatus}</p>
-            )}
+            {configStatus && <p className="text-xs text-emerald-400 bg-emerald-400/10 rounded-lg px-3 py-2">{configStatus}</p>}
           </div>
 
           <div className="flex flex-col gap-1.5">
@@ -332,9 +321,7 @@ export function AICopilotPanel() {
             {loading ? '生成中…' : '发送给 AI'}
           </button>
 
-          {error && (
-            <p className="text-xs text-red-400 bg-red-400/10 rounded-lg px-3 py-2">{error}</p>
-          )}
+          {error && <p className="text-xs text-red-400 bg-red-400/10 rounded-lg px-3 py-2">{error}</p>}
 
           {result && (
             <div className="flex flex-col gap-1.5">

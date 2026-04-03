@@ -4,7 +4,8 @@ import { getJwtSecretBytes } from '@/lib/server/auth-config';
 
 const PROTECTED_PATHS = [
   { method: 'POST', path: '/api/config' },
-  { method: 'POST', path: '/api/ai/copilot' },
+  { method: 'POST', path: '/api/chat-completion' },
+  { method: 'POST', path: '/api/completion-config' },
 ];
 
 export async function proxy(req: NextRequest) {
@@ -32,5 +33,5 @@ export async function proxy(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/api/config', '/api/ai/copilot'],
+  matcher: ['/api/config', '/api/chat-completion', '/api/completion-config'],
 };

@@ -69,7 +69,7 @@ export interface ModuleInstance {
   };
 }
 
-export interface AICopilotConfig {
+export interface ChatCompletionConfig {
   baseUrl: string;
   model: string;
   hasApiKey: boolean;
@@ -86,7 +86,7 @@ export interface PageConfig {
     favicon: string;
     language: string;
   };
-  aiCopilot: AICopilotConfig;
+  chatCompletion: ChatCompletionConfig;
   appearance?: LegacyPageAppearance;
   layouts: Record<Breakpoint, LayoutRect[]>;
   modules: ModuleInstance[];
@@ -95,7 +95,7 @@ export interface PageConfig {
 export interface AppUIState {
   isAuthenticated: boolean;
   isEditMode: boolean;
-  activePanel: 'none' | 'modules' | 'plugins' | 'ai_copilot';
+  activePanel: 'none' | 'modules' | 'plugins' | 'chat_completion';
 }
 
 const DEFAULT_MODULE_APPEARANCE: ModuleAppearance = {
@@ -116,19 +116,19 @@ const DEFAULT_MODULE_APPEARANCE: ModuleAppearance = {
   shadow: 'medium',
 };
 
-const DEFAULT_AI_COPILOT_CONFIG: AICopilotConfig = {
+const DEFAULT_CHAT_COMPLETION_CONFIG: ChatCompletionConfig = {
   baseUrl: '',
   model: '',
   hasApiKey: false,
 };
 
-function normalizeAICopilotConfig(config?: Partial<AICopilotConfig> | Record<string, unknown> | null): AICopilotConfig {
-  if (!config || typeof config !== 'object') return DEFAULT_AI_COPILOT_CONFIG;
+function normalizeChatCompletionConfig(config?: Partial<ChatCompletionConfig> | Record<string, unknown> | null): ChatCompletionConfig {
+  if (!config || typeof config !== 'object') return DEFAULT_CHAT_COMPLETION_CONFIG;
 
   return {
-    baseUrl: typeof config.baseUrl === 'string' ? config.baseUrl : DEFAULT_AI_COPILOT_CONFIG.baseUrl,
-    model: typeof config.model === 'string' ? config.model : DEFAULT_AI_COPILOT_CONFIG.model,
-    hasApiKey: typeof config.hasApiKey === 'boolean' ? config.hasApiKey : DEFAULT_AI_COPILOT_CONFIG.hasApiKey,
+    baseUrl: typeof config.baseUrl === 'string' ? config.baseUrl : DEFAULT_CHAT_COMPLETION_CONFIG.baseUrl,
+    model: typeof config.model === 'string' ? config.model : DEFAULT_CHAT_COMPLETION_CONFIG.model,
+    hasApiKey: typeof config.hasApiKey === 'boolean' ? config.hasApiKey : DEFAULT_CHAT_COMPLETION_CONFIG.hasApiKey,
   };
 }
 
@@ -200,7 +200,7 @@ function normalizePageConfig(config: PageConfig): PageConfig {
   const legacyAppearance = config.appearance ?? LEGACY_DEFAULT_APPEARANCE;
   return {
     ...config,
-    aiCopilot: normalizeAICopilotConfig(config.aiCopilot),
+    chatCompletion: normalizeChatCompletionConfig(config.chatCompletion),
     modules: config.modules.map((module) => normalizeModule(module, legacyAppearance)),
   };
 }
@@ -255,7 +255,7 @@ const DEFAULT_MODULES: ModuleInstance[] = [
   <div class="line out">✓ Bento Box Layout Engine</div>
   <div class="line out">✓ Multi-breakpoint Responsive Grid</div>
   <div class="line out">✓ Plugin Ecosystem</div>
-  <div class="line out">✓ AI Copilot Design</div>
+  <div class="line out">✓ Chat Completion Design</div>
   <div class="line out">✓ Module-level Styling</div>
   <div class="line">&nbsp;</div>
   <div class="line"><span class="prompt">lumina@craft</span><span class="cmd"> ~ % <span class="blink">█</span></span></div>
@@ -298,7 +298,7 @@ const DEFAULT_PAGE_CONFIG: PageConfig = normalizePageConfig({
     favicon: '/favicon.ico',
     language: 'zh-CN',
   },
-  aiCopilot: DEFAULT_AI_COPILOT_CONFIG,
+  chatCompletion: DEFAULT_CHAT_COMPLETION_CONFIG,
   appearance: LEGACY_DEFAULT_APPEARANCE,
   layouts: {
     xl: [
@@ -336,7 +336,7 @@ interface AppStore extends AppUIState {
   isModuleLibraryOpen: boolean;
   isSitePanelOpen: boolean;
   isBackgroundPanelOpen: boolean;
-  isAiCopilotOpen: boolean;
+  isChatCompletionOpen: boolean;
   toggleEditMode: () => void;
   setAuthenticated: (v: boolean) => void;
   setActivePanel: (panel: AppUIState['activePanel']) => void;
@@ -357,9 +357,9 @@ interface AppStore extends AppUIState {
   toggleBackgroundPanel: () => void;
   closeBackgroundPanel: () => void;
   updateSite: (patch: Partial<PageConfig['site']>) => void;
-  updateAICopilotConfig: (patch: Partial<AICopilotConfig>) => void;
-  toggleAiCopilot: () => void;
-  closeAiCopilot: () => void;
+  updateChatCompletionConfig: (patch: Partial<ChatCompletionConfig>) => void;
+  toggleChatCompletion: () => void;
+  closeChatCompletion: () => void;
 }
 
 export const useAppStore = create<AppStore>((set) => ({
@@ -370,7 +370,7 @@ export const useAppStore = create<AppStore>((set) => ({
   isModuleLibraryOpen: false,
   isSitePanelOpen: false,
   isBackgroundPanelOpen: false,
-  isAiCopilotOpen: false,
+  isChatCompletionOpen: false,
   pageConfig: DEFAULT_PAGE_CONFIG,
 
   toggleEditMode: () =>
@@ -516,19 +516,19 @@ export const useAppStore = create<AppStore>((set) => ({
       },
     })),
 
-  updateAICopilotConfig: (patch) =>
+  updateChatCompletionConfig: (patch) =>
     set((state) => ({
       pageConfig: {
         ...state.pageConfig,
-        aiCopilot: {
-          ...state.pageConfig.aiCopilot,
+        chatCompletion: {
+          ...state.pageConfig.chatCompletion,
           ...patch,
         },
       },
     })),
 
-  toggleAiCopilot: () =>
-    set((state) => ({ isAiCopilotOpen: !state.isAiCopilotOpen })),
+  toggleChatCompletion: () =>
+    set((state) => ({ isChatCompletionOpen: !state.isChatCompletionOpen })),
 
-  closeAiCopilot: () => set({ isAiCopilotOpen: false }),
+  closeChatCompletion: () => set({ isChatCompletionOpen: false }),
 }));
