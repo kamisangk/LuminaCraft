@@ -141,68 +141,8 @@ const LEGACY_DEFAULT_APPEARANCE: LegacyPageAppearance = {
     text: '#e6edf3',
   },
   background: {
-    type: 'html',
-    value: `<!DOCTYPE html>
-<html lang="zh-CN">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&display=swap" rel="stylesheet">
-<style>
-*{margin:0;padding:0;box-sizing:border-box}
-html,body{width:100%;height:100%;overflow:hidden}
-body{
-  background:#ffffff;
-  display:flex;
-  align-items:center;
-  justify-content:center;
-}
-.clock-wrap{
-  position:relative;
-  width:min(90vw,90vh);
-  height:min(90vw,90vh);
-}
-.clock-svg{
-  width:100%;
-  height:100%;
-  overflow:visible;
-}
-.dial-ring{
-  transform-origin:250px 250px;
-}
-</style>
-</head>
-<body>
-<div class="clock-wrap">
-<svg class="clock-svg" viewBox="0 0 500 500">
-  <g class="dial-ring" id="hourRing">
-    <circle cx="250" cy="250" r="140" fill="none" stroke="#d0d0d0" stroke-width="1.5"/>
-    <text x="310" y="146.08" font-size="18" fill="#222" text-anchor="middle" dominant-baseline="middle" font-family="JetBrains Mono" font-weight="800" transform="rotate(30,310,146.08)">1</text>
-    <text x="353.92" y="190" font-size="18" fill="#222" text-anchor="middle" dominant-baseline="middle" font-family="JetBrains Mono" font-weight="800" transform="rotate(60,353.92,190)">2</text>
-    <text x="370" y="250" font-size="18" fill="#222" text-anchor="middle" dominant-baseline="middle" font-family="JetBrains Mono" font-weight="800" transform="rotate(90,370,250)">3</text>
-    <text x="353.92" y="310" font-size="18" fill="#222" text-anchor="middle" dominant-baseline="middle" font-family="JetBrains Mono" font-weight="800" transform="rotate(120,353.92,310)">4</text>
-    <text x="310" y="353.92" font-size="18" fill="#222" text-anchor="middle" dominant-baseline="middle" font-family="JetBrains Mono" font-weight="800" transform="rotate(150,310,353.92)">5</text>
-    <text x="250" y="370" font-size="18" fill="#222" text-anchor="middle" dominant-baseline="middle" font-family="JetBrains Mono" font-weight="800" transform="rotate(180,250,370)">6</text>
-    <text x="190" y="353.92" font-size="18" fill="#222" text-anchor="middle" dominant-baseline="middle" font-family="JetBrains Mono" font-weight="800" transform="rotate(210,190,353.92)">7</text>
-    <text x="146.08" y="310" font-size="18" fill="#222" text-anchor="middle" dominant-baseline="middle" font-family="JetBrains Mono" font-weight="800" transform="rotate(240,146.08,310)">8</text>
-    <text x="130" y="250" font-size="18" fill="#222" text-anchor="middle" dominant-baseline="middle" font-family="JetBrains Mono" font-weight="800" transform="rotate(270,130,250)">9</text>
-    <text x="146.08" y="190" font-size="18" fill="#222" text-anchor="middle" dominant-baseline="middle" font-family="JetBrains Mono" font-weight="800" transform="rotate(300,146.08,190)">10</text>
-    <text x="190" y="146.08" font-size="18" fill="#222" text-anchor="middle" dominant-baseline="middle" font-family="JetBrains Mono" font-weight="800" transform="rotate(330,190,146.08)">11</text>
-    <text x="250" y="130" font-size="18" fill="#222" text-anchor="middle" dominant-baseline="middle" font-family="JetBrains Mono" font-weight="800" transform="rotate(360,250,130)">12</text>
-  </g>
-</svg>
-</div>
-<script>
-function update(){
-  var now=new Date();
-  var h=now.getHours()%12+now.getMinutes()/60+now.getSeconds()/3600;
-  document.getElementById('hourRing').style.transform='rotate('+(- h*(360/12))+'deg)';
-}
-update();
-setInterval(update,50);
-</script>
-</body>
-</html>`,
+    type: 'color',
+    value: '#0d1117',
     blur: 0,
     opacity: 1,
     noisePattern: false,
@@ -274,7 +214,7 @@ const DEFAULT_MODULES: ModuleInstance[] = [
     appearance: createModuleAppearance(),
     props: {
       name: 'LuminaCraft User',
-      bio: '欢迎来到我的数字身份枢纽 · Welcome to my digital hub',
+      bio: '欢迎来到我的个人主页 · Welcome to my homepage',
       avatar: 'https://avatars.githubusercontent.com/u/0',
       links: [
         { label: 'GitHub', url: 'https://github.com' },
@@ -286,7 +226,7 @@ const DEFAULT_MODULES: ModuleInstance[] = [
     id: 'html-terminal-1',
     category: 'core',
     type: 'html_block',
-    title: '终端模拟器',
+    title: '代码块',
     appearance: createModuleAppearance({
       colors: {
         primary: '#58a6ff',
@@ -353,7 +293,7 @@ const DEFAULT_PAGE_CONFIG: PageConfig = normalizePageConfig({
   templateAuthor: 'LuminaCraft',
   site: {
     title: 'LuminaCraft - 琉璃工艺',
-    description: '我的个人数字身份枢纽',
+    description: '我的个人主页',
     keywords: ['portfolio', 'homepage', 'bento'],
     favicon: '/favicon.ico',
     language: 'zh-CN',

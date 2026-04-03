@@ -271,7 +271,7 @@ function ModuleAppearanceForm({ module }: { module: ModuleInstance }) {
       resolvedType === 'color'
         ? '#0d1117'
         : resolvedType === 'html'
-          ? customHtml || HTML_PRESETS[0]?.html || ''
+          ? customHtml
           : resolvedType === 'transparent'
             ? ''
             : appearance.background.type === resolvedType
@@ -309,7 +309,7 @@ function ModuleAppearanceForm({ module }: { module: ModuleInstance }) {
     setIsHtmlPresetMenuOpen(false);
 
     if (value === HTML_CUSTOM_VALUE) {
-      const nextValue = customHtml || appearance.background.value || HTML_PRESETS[0]?.html || '';
+      const nextValue = matchedHtmlPreset ? '' : customHtml;
       setCustomHtml(nextValue);
       setBackground('value', nextValue);
       return;

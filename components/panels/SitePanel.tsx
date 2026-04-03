@@ -380,7 +380,7 @@ export function BackgroundPanel() {
       resolvedType === 'color'
         ? '#0d1117'
         : resolvedType === 'html'
-          ? customHtml || HTML_PRESETS[0]?.html || ''
+          ? customHtml
           : resolvedType === 'transparent'
             ? ''
             : background?.type === resolvedType
@@ -406,7 +406,7 @@ export function BackgroundPanel() {
     setIsHtmlPresetMenuOpen(false);
 
     if (value === HTML_CUSTOM_VALUE) {
-      const nextValue = customHtml || background?.value || HTML_PRESETS[0]?.html || '';
+      const nextValue = matchedHtmlPreset ? '' : customHtml;
       setCustomHtml(nextValue);
       updatePageBackground({ type: 'html', value: nextValue });
       return;
