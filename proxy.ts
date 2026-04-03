@@ -1,9 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { jwtVerify } from 'jose';
-
-const SECRET = new TextEncoder().encode(
-  process.env.LUMINA_JWT_SECRET ?? 'lumina-dev-secret-change-in-production'
-);
+import { getJwtSecretBytes } from '@/lib/server/auth-config';
 
 const PROTECTED_PATHS = [
   { method: 'POST', path: '/api/config' },
@@ -26,7 +23,7 @@ export async function proxy(req: NextRequest) {
   }
 
   try {
-    const { payload } = await jwtVerify(token, SECRET);
+    const { payload } = await jwtVerify(token, getJwtSecretBytes());
     if (payload.role !== 'owner') throw new Error('Not owner');
     return NextResponse.next();
   } catch {

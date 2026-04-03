@@ -1,10 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { SignJWT } from 'jose';
-
-const SECRET = new TextEncoder().encode(
-  process.env.LUMINA_JWT_SECRET ?? 'lumina-dev-secret-change-in-production'
-);
-const DEFAULT_OWNER_PASSWORD = 'lumina-dev-password';
+import { getAuthRuntimeConfig, getJwtSecretBytes } from '@/lib/server/auth-config';
 
 export async function POST(req: NextRequest) {
   let body: { password?: string };
@@ -14,7 +10,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
   }
 
-  const ownerPassword = process.env.LUMINA_OWNER_PASSWORD ?? DEFAULT_OWNER_PASSWORD;
+  const { ownerPassword } = getAuthRuntimeConfig();
 
   if (body.password !== ownerPassword) {
     return NextResponse.json({ error: 'Invalid password' }, { status: 401 });
@@ -24,7 +20,7 @@ export async function POST(req: NextRequest) {
     .setProtectedHeader({ alg: 'HS256' })
     .setIssuedAt()
     .setExpirationTime('7d')
-    .sign(SECRET);
+    .sign(getJwtSecretBytes());
 
   const response = NextResponse.json({ ok: true });
   response.cookies.set('lumina_token', token, {
