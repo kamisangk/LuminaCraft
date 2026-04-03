@@ -46,7 +46,7 @@ const MODULE_TEMPLATES: ModuleTemplate[] = [
     type: 'html_block',
     title: 'HTML Block',
     category: 'core',
-    description: '自定义 HTML/CSS 内容块',
+    description: '支持完整 HTML 文档的自定义内容块',
     defaultProps: {
       htmlContent:
         '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:#e6edf3;font-size:18px;">Hello, World!</div>',

@@ -162,6 +162,7 @@ export function ModuleWrapper({ module }: ModuleWrapperProps) {
         </div>
       )}
       <div className="relative z-[1] h-full w-full">{renderModule(module)}</div>
+      {isEditMode && <div className="absolute inset-0 z-[2] cursor-move" aria-hidden="true" />}
     </div>
   );
 }

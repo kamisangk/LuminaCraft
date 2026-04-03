@@ -1,33 +1,67 @@
 'use client';
 
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { ModuleInstance } from '@/store/useAppStore';
 
+function buildHtmlDocument(htmlContent: string) {
+  const trimmed = htmlContent.trim();
+  const isFullDocument = /<!doctype\s+html|<html[\s>]/i.test(trimmed);
+
+  if (isFullDocument) {
+    return htmlContent;
+  }
+
+  return `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <style>
+    html, body {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      padding: 0;
+      background: transparent;
+      overflow: auto;
+    }
+
+    body {
+      color: inherit;
+    }
+  </style>
+</head>
+<body>
+${htmlContent}
+</body>
+</html>`;
+}
+
 export function HtmlBlockModule({ module }: { module: ModuleInstance }) {
-  const { htmlContent } = module.props;
-  const containerRef = useRef<HTMLDivElement>(null);
+  const htmlContent = typeof module.props.htmlContent === 'string' ? module.props.htmlContent : '';
+  const htmlDocument = useMemo(() => buildHtmlDocument(htmlContent), [htmlContent]);
+  const [blobUrl, setBlobUrl] = useState('');
 
   useEffect(() => {
-    if (!containerRef.current || typeof htmlContent !== 'string') return;
+    const blob = new Blob([htmlDocument], { type: 'text/html;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    setBlobUrl(url);
 
-    // 动态导入 DOMPurify 仅在客户端
-    import('dompurify').then((mod) => {
-      const DOMPurify = mod.default;
-      const clean = DOMPurify.sanitize(htmlContent, {
-        ADD_TAGS: ['style'],
-        ADD_ATTR: ['class', 'id'],
-        FORCE_BODY: false,
-      });
-      if (containerRef.current) {
-        containerRef.current.innerHTML = clean;
-      }
-    });
-  }, [htmlContent]);
+    return () => {
+      URL.revokeObjectURL(url);
+    };
+  }, [htmlDocument]);
+
+  if (!blobUrl) {
+    return <div className="h-full w-full" />;
+  }
 
   return (
-    <div
-      ref={containerRef}
-      className="w-full h-full overflow-auto"
+    <iframe
+      key={`${module.id}-${blobUrl}`}
+      title={module.title || 'html-block'}
+      className="h-full w-full border-0"
+      src={blobUrl}
+      sandbox="allow-scripts"
     />
   );
 }
