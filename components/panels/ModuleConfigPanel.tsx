@@ -425,7 +425,7 @@ function ModuleAppearanceForm({ module }: { module: ModuleInstance }) {
                   onClick={() => setIsHtmlPresetMenuOpen((open) => !open)}
                   aria-haspopup="listbox"
                   aria-expanded={isHtmlPresetMenuOpen}
-                  className="flex w-full items-center justify-between rounded-xl border border-white/10 bg-gradient-to-br from-slate-900/95 to-slate-800/95 px-3 py-2.5 text-sm outline-none transition-all duration-200 hover:border-white/20 hover:from-slate-800/95 hover:to-slate-700/95 focus:border-blue-400/60 focus:ring-2 focus:ring-blue-400/20"
+                  className="flex w-full items-center justify-between rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm outline-none transition-colors hover:border-white/20 hover:bg-white/10 focus:border-blue-400/60 focus:ring-2 focus:ring-blue-400/20"
                   style={{ color: 'var(--color-text)', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.04), 0 8px 24px rgba(0,0,0,0.18)' }}
                 >
                   <span className="truncate text-left">{matchedHtmlPreset?.name ?? '自定义'}</span>
@@ -443,8 +443,8 @@ function ModuleAppearanceForm({ module }: { module: ModuleInstance }) {
                 </button>
                 {isHtmlPresetMenuOpen && (
                   <div
-                    className="absolute left-0 right-0 top-[calc(100%+0.5rem)] z-20 overflow-hidden rounded-2xl border border-white/10 bg-slate-950/95 p-1 shadow-2xl backdrop-blur-xl"
-                    style={{ boxShadow: '0 24px 64px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.05)' }}
+                    className="absolute left-0 right-0 top-[calc(100%+0.375rem)] z-20 overflow-hidden rounded-lg border border-white/10 bg-[#0d1117]/95 p-1 shadow-xl backdrop-blur-sm"
+                    style={{ boxShadow: '0 16px 40px rgba(0,0,0,0.28)' }}
                   >
                     <div className="mb-1 rounded-xl border border-blue-400/15 bg-blue-500/8 p-1">
                       <button
