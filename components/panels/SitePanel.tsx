@@ -9,7 +9,6 @@ const PAGE_BG_TYPE_OPTIONS = [
   { value: 'color', label: '纯色' },
   { value: 'media', label: '媒体' },
   { value: 'html', label: 'HTML' },
-  { value: 'transparent', label: '透明' },
 ] as const;
 const MEDIA_KIND_OPTIONS = [
   { value: 'image', label: '图片' },
@@ -381,11 +380,9 @@ export function BackgroundPanel() {
         ? '#0d1117'
         : resolvedType === 'html'
           ? customHtml
-          : resolvedType === 'transparent'
-            ? ''
-            : background?.type === resolvedType
-              ? background.value
-              : '';
+          : background?.type === resolvedType
+            ? background.value
+            : '';
 
     updatePageBackground({ type: resolvedType, value: nextValue });
 
@@ -471,7 +468,7 @@ export function BackgroundPanel() {
         <div className="flex-1 overflow-y-auto px-4 py-4 flex flex-col gap-4">
           <Section title="主页背景">
             <Field label="背景类型">
-              <div className="grid grid-cols-4 gap-1">
+              <div className="grid grid-cols-3 gap-1">
                 {PAGE_BG_TYPE_OPTIONS.map((type) => (
                   <button
                     key={type.value}
