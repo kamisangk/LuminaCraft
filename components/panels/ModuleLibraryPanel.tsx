@@ -1,107 +1,9 @@
 'use client';
 
 import React from 'react';
-import { useAppStore, ModuleInstance, ModuleCategory, GithubPluginSettings } from '@/store/useAppStore';
-
-interface ModuleTemplate {
-  type: string;
-  title: string;
-  category: ModuleCategory;
-  description: string;
-  defaultProps: ModuleInstance['props'];
-  defaultAppearance: ModuleInstance['appearance'];
-}
-
-const MODULE_TEMPLATES: ModuleTemplate[] = [
-  {
-    type: 'profile',
-    title: '个人档案',
-    category: 'core',
-    description: '显示头像、姓名、简介和社交链接',
-    defaultProps: {
-      name: '新用户',
-      bio: '个人简介',
-      avatar: 'https://avatars.githubusercontent.com/u/0',
-      links: [],
-    },
-    defaultAppearance: {
-      colors: {
-        primary: '#58a6ff',
-        surface: 'rgba(15, 23, 42, 0.88)',
-        text: '#f8fafc',
-      },
-      background: {
-        type: 'color',
-        value: 'rgba(255,255,255,0.03)',
-        blur: 18,
-        opacity: 1,
-        noisePattern: false,
-      },
-      borderRadius: 20,
-      padding: 18,
-      shadow: 'medium',
-    },
-  },
-  {
-    type: 'html_block',
-    title: 'HTML Block',
-    category: 'core',
-    description: '支持完整 HTML 文档的自定义内容块',
-    defaultProps: {
-      htmlContent:
-        '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:#e6edf3;font-size:18px;">Hello, World!</div>',
-    },
-    defaultAppearance: {
-      colors: {
-        primary: '#22c55e',
-        surface: 'rgba(10, 14, 23, 0.92)',
-        text: '#e5eefc',
-      },
-      background: {
-        type: 'color',
-        value: 'rgba(255,255,255,0.02)',
-        blur: 12,
-        opacity: 1,
-        noisePattern: false,
-      },
-      borderRadius: 18,
-      padding: 12,
-      shadow: 'soft',
-    },
-  },
-  {
-    type: 'github_plugin',
-    title: 'GitHub',
-    category: 'plugin',
-    description: '显示 GitHub 资料、统计和仓库列表',
-    defaultProps: {
-      pluginSettings: {
-        username: 'octocat',
-        showProfile: true,
-        showStats: true,
-        showRepos: true,
-        repoLimit: 4,
-      } satisfies GithubPluginSettings,
-    },
-    defaultAppearance: {
-      colors: {
-        primary: '#8b5cf6',
-        surface: 'rgba(17, 24, 39, 0.9)',
-        text: '#f8fafc',
-      },
-      background: {
-        type: 'color',
-        value: 'rgba(139,92,246,0.06)',
-        blur: 20,
-        opacity: 1,
-        noisePattern: false,
-      },
-      borderRadius: 20,
-      padding: 16,
-      shadow: 'strong',
-    },
-  },
-];
+import { useAppStore, ModuleInstance, ModuleCategory } from '@/store/useAppStore';
+import { getAllModuleDefinitions } from '@/lib/modules';
+import type { ModuleDefinition } from '@/lib/moduleRegistry';
 
 const CATEGORY_LABEL: Record<ModuleCategory, string> = {
   core: '模块',
@@ -118,21 +20,23 @@ export function ModuleLibraryPanel() {
   const closeModuleLibrary = useAppStore((s) => s.closeModuleLibrary);
   const addModule = useAppStore((s) => s.addModule);
 
-  const handleAdd = (template: ModuleTemplate) => {
-    const id = `${template.type}-${Date.now()}`;
+  const handleAdd = (definition: ModuleDefinition) => {
+    const id = `${definition.type}-${Date.now()}`;
     addModule({
       id,
-      category: template.category,
-      type: template.type,
-      title: template.title,
+      category: definition.category,
+      type: definition.type,
+      title: definition.title,
       appearance: {
-        ...template.defaultAppearance,
-        colors: { ...template.defaultAppearance.colors },
-        background: { ...template.defaultAppearance.background },
+        ...definition.defaultAppearance,
+        colors: { ...definition.defaultAppearance.colors },
+        background: { ...definition.defaultAppearance.background },
       },
-      props: { ...template.defaultProps },
+      props: { ...definition.defaultProps },
     });
   };
+
+  const definitions = getAllModuleDefinitions();
 
   return (
     <>
@@ -174,9 +78,9 @@ export function ModuleLibraryPanel() {
         </div>
 
         <div className="flex flex-1 flex-col gap-2 overflow-y-auto px-3 py-3">
-          {MODULE_TEMPLATES.map((tpl) => (
+          {definitions.map((def) => (
             <div
-              key={tpl.type}
+              key={def.type}
               className="flex flex-col gap-2 rounded-xl border p-3"
               style={{
                 background: 'rgba(255,255,255,0.03)',
@@ -187,19 +91,19 @@ export function ModuleLibraryPanel() {
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
                     <span className="text-sm font-medium" style={{ color: 'var(--color-text)' }}>
-                      {tpl.title}
+                      {def.title}
                     </span>
-                    <span className={`rounded px-1.5 py-0.5 text-[10px] font-medium ${CATEGORY_COLOR[tpl.category]}`}>
-                      {CATEGORY_LABEL[tpl.category]}
+                    <span className={`rounded px-1.5 py-0.5 text-[10px] font-medium ${CATEGORY_COLOR[def.category]}`}>
+                      {CATEGORY_LABEL[def.category]}
                     </span>
                   </div>
                   <p className="mt-0.5 text-xs leading-relaxed opacity-40" style={{ color: 'var(--color-text)' }}>
-                    {tpl.description}
+                    {def.description}
                   </p>
                 </div>
               </div>
               <button
-                onClick={() => handleAdd(tpl)}
+                onClick={() => handleAdd(def)}
                 className="w-full rounded-lg border border-blue-500/20 bg-blue-500/20 py-1.5 text-xs font-medium text-blue-300 transition-colors duration-150 hover:bg-blue-500/40"
               >
                 + 添加到页面

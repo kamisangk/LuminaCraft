@@ -2,9 +2,7 @@
 
 import React, { useMemo } from 'react';
 import { useAppStore, ModuleInstance } from '@/store/useAppStore';
-import { ProfileModule } from './ProfileModule';
-import { HtmlBlockModule } from './HtmlBlockModule';
-import { GithubPlaceholderModule } from './GithubPlaceholderModule';
+import { getModuleDefinition } from '@/lib/modules';
 
 interface ModuleWrapperProps {
   module: ModuleInstance;
@@ -22,22 +20,18 @@ const SHADOW_STYLES: Record<ModuleInstance['appearance']['shadow'], string> = {
 };
 
 function renderModule(module: ModuleInstance) {
-  switch (module.type) {
-    case 'profile':
-      return <ProfileModule module={module} />;
-    case 'html_block':
-      return <HtmlBlockModule module={module} />;
-    case 'github_plugin':
-      return <GithubPlaceholderModule module={module} />;
-    default:
-      return (
-        <div className="flex h-full items-center justify-center opacity-40">
-          <p className="text-sm" style={{ color: 'var(--color-text)' }}>
-            未知模块: {module.type}
-          </p>
-        </div>
-      );
+  const definition = getModuleDefinition(module.type);
+  if (definition) {
+    const Comp = definition.Component;
+    return <Comp module={module} />;
   }
+  return (
+    <div className="flex h-full items-center justify-center opacity-40">
+      <p className="text-sm" style={{ color: 'var(--color-text)' }}>
+        未知模块: {module.type}
+      </p>
+    </div>
+  );
 }
 
 export function ModuleWrapper({ module }: ModuleWrapperProps) {

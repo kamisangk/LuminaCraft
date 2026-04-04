@@ -4,10 +4,20 @@ import React, { useCallback, useMemo, useRef, useState } from 'react';
 import {
   useAppStore,
   ModuleInstance,
-  GithubPluginSettings,
   ModuleAppearance,
 } from '@/store/useAppStore';
 import { HTML_PRESETS } from './backgroundHtmlPresets';
+import { getModuleDefinition } from '@/lib/modules';
+import {
+  Section,
+  PanelBlock,
+  Field,
+  TextInput,
+  TextArea,
+  ColorRow,
+  Toggle,
+  toHexSafe,
+} from './FormPrimitives';
 
 const HTML_CUSTOM_VALUE = '__custom__';
 const BG_TYPES = [
@@ -24,163 +34,6 @@ const SHADOW_OPTIONS: { value: ModuleAppearance['shadow']; label: string }[] = [
   { value: 'medium', label: '标准' },
   { value: 'strong', label: '强烈' },
 ];
-
-function ProfileForm({ module }: { module: ModuleInstance }) {
-  const updateModuleProps = useAppStore((s) => s.updateModuleProps);
-  const props = module.props as {
-    name?: string;
-    bio?: string;
-    avatar?: string;
-    links?: { label: string; url: string }[];
-  };
-  const links: { label: string; url: string }[] = Array.isArray(props.links) ? props.links : [];
-
-  const set = useCallback(
-    (patch: Record<string, unknown>) => updateModuleProps(module.id, patch),
-    [module.id, updateModuleProps]
-  );
-
-  const setLink = (i: number, field: 'label' | 'url', val: string) => {
-    const next = links.map((l, idx) => (idx === i ? { ...l, [field]: val } : l));
-    set({ links: next });
-  };
-
-  const addLink = () => set({ links: [...links, { label: '', url: '' }] });
-
-  const removeLink = (i: number) => set({ links: links.filter((_, idx) => idx !== i) });
-
-  return (
-    <div className="flex flex-col gap-4">
-      <Field label="姓名">
-        <TextInput value={props.name ?? ''} onChange={(v) => set({ name: v })} />
-      </Field>
-      <Field label="简介">
-        <TextArea value={props.bio ?? ''} onChange={(v) => set({ bio: v })} rows={3} />
-      </Field>
-      <Field label="头像 URL">
-        <TextInput value={props.avatar ?? ''} onChange={(v) => set({ avatar: v })} placeholder="https://..." />
-      </Field>
-      <div>
-        <div className="mb-2 flex items-center justify-between">
-          <span className="text-xs font-medium opacity-60" style={{ color: 'var(--color-text)' }}>
-            链接
-          </span>
-          <button
-            onClick={addLink}
-            className="rounded bg-blue-500/20 px-2 py-0.5 text-xs text-blue-300 transition-colors hover:bg-blue-500/40"
-          >
-            + 添加
-          </button>
-        </div>
-        <div className="flex flex-col gap-2">
-          {links.map((link, i) => (
-            <div key={i} className="grid w-full grid-cols-[5rem_minmax(0,1fr)_1.5rem] items-center gap-2">
-              <TextInput
-                value={link.label}
-                onChange={(v) => setLink(i, 'label', v)}
-                placeholder="标签"
-                className="min-w-0"
-              />
-              <TextInput
-                value={link.url}
-                onChange={(v) => setLink(i, 'url', v)}
-                placeholder="URL"
-                className="min-w-0"
-              />
-              <button
-                onClick={() => removeLink(i)}
-                className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded text-red-400/70 transition-colors hover:bg-red-500/10 hover:text-red-400"
-                title="删除"
-              >
-                ×
-              </button>
-            </div>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function HtmlBlockForm({ module }: { module: ModuleInstance }) {
-  const updateModuleProps = useAppStore((s) => s.updateModuleProps);
-  const htmlContent = typeof module.props.htmlContent === 'string' ? module.props.htmlContent : '';
-
-  return (
-    <Field label="HTML 文档">
-      <TextArea
-        value={htmlContent}
-        onChange={(v) => updateModuleProps(module.id, { htmlContent: v })}
-        rows={16}
-        monospace
-        placeholder="支持完整 HTML 文档，例如 <!DOCTYPE html><html>...</html>"
-      />
-      <div className="mt-2 text-xs opacity-50" style={{ color: 'var(--color-text)' }}>
-        内容会通过 iframe 渲染，支持 HTML / CSS / JS，并在沙箱环境中运行。
-      </div>
-    </Field>
-  );
-}
-
-function GithubPluginForm({ module }: { module: ModuleInstance }) {
-  const updateModuleProps = useAppStore((s) => s.updateModuleProps);
-  const settings = (module.props.pluginSettings ?? {}) as GithubPluginSettings;
-
-  const setSettings = (patch: Partial<GithubPluginSettings>) => {
-    updateModuleProps(module.id, {
-      pluginSettings: { ...settings, ...patch },
-    });
-  };
-
-  return (
-    <div className="flex flex-col gap-4">
-      <Field label="GitHub 用户名">
-        <TextInput
-          value={settings.username ?? ''}
-          onChange={(v) => setSettings({ username: v })}
-          placeholder="octocat"
-        />
-      </Field>
-
-      <Field label="仓库数量">
-        <input
-          type="range"
-          min={1}
-          max={8}
-          value={settings.repoLimit ?? 4}
-          onChange={(e) => setSettings({ repoLimit: Number(e.target.value) })}
-          className="w-full accent-blue-400"
-        />
-        <div className="mt-1 text-xs opacity-40" style={{ color: 'var(--color-text)' }}>
-          最多显示 {settings.repoLimit ?? 4} 个公开仓库
-        </div>
-      </Field>
-
-      <div className="grid grid-cols-1 gap-2">
-        <ToggleRow
-          label="显示资料"
-          checked={settings.showProfile ?? true}
-          onChange={(checked) => setSettings({ showProfile: checked })}
-        />
-        <ToggleRow
-          label="显示统计"
-          checked={settings.showStats ?? true}
-          onChange={(checked) => setSettings({ showStats: checked })}
-        />
-        <ToggleRow
-          label="显示仓库"
-          checked={settings.showRepos ?? true}
-          onChange={(checked) => setSettings({ showRepos: checked })}
-        />
-        <ToggleRow
-          label="显示热力图"
-          checked={settings.showHeatmap ?? false}
-          onChange={(checked) => setSettings({ showHeatmap: checked })}
-        />
-      </div>
-    </div>
-  );
-}
 
 function JsonEditor({ module }: { module: ModuleInstance }) {
   const updateModuleProps = useAppStore((s) => s.updateModuleProps);
@@ -204,7 +57,9 @@ function JsonEditor({ module }: { module: ModuleInstance }) {
 function ModuleAppearanceForm({ module }: { module: ModuleInstance }) {
   const updateModuleAppearance = useAppStore((s) => s.updateModuleAppearance);
   const appearance = module.appearance;
-  const isHtmlBlock = module.type === 'html_block';
+  const definition = getModuleDefinition(module.type);
+  const showColorSection = definition?.appearanceConfig.showColorSection ?? true;
+  const showBackgroundSection = definition?.appearanceConfig.showBackgroundSection ?? true;
   const [customHtml, setCustomHtml] = useState(
     appearance.background.type === 'html' ? appearance.background.value : ''
   );
@@ -331,7 +186,7 @@ function ModuleAppearanceForm({ module }: { module: ModuleInstance }) {
 
   return (
     <div className="flex flex-col gap-5">
-      {!isHtmlBlock && (
+      {showColorSection && (
         <Section title="颜色">
           <Field label="强调色">
             <div className="flex items-center gap-2">
@@ -348,7 +203,7 @@ function ModuleAppearanceForm({ module }: { module: ModuleInstance }) {
         </Section>
       )}
 
-      {!isHtmlBlock && (
+      {showBackgroundSection && (
       <Section title="背景">
         <Field label="背景类型">
           <div className="grid grid-cols-3 gap-1">
@@ -584,195 +439,13 @@ function ModuleAppearanceForm({ module }: { module: ModuleInstance }) {
   );
 }
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <div>
-      <p
-        className="mb-3 text-[11px] font-semibold uppercase tracking-widest opacity-30"
-        style={{ color: 'var(--color-text)' }}
-      >
-        {title}
-      </p>
-      <div className="flex flex-col gap-3">{children}</div>
-    </div>
-  );
-}
-
-function PanelBlock({ title, description, children }: { title: string; description?: string; children: React.ReactNode }) {
-  return (
-    <section className="rounded-2xl border border-white/8 bg-white/[0.03] p-3">
-      <div className="mb-3">
-        <h4 className="text-sm font-semibold" style={{ color: 'var(--color-text)' }}>
-          {title}
-        </h4>
-        {description && (
-          <p className="mt-1 text-[11px] leading-relaxed opacity-40" style={{ color: 'var(--color-text)' }}>
-            {description}
-          </p>
-        )}
-      </div>
-      {children}
-    </section>
-  );
-}
-
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div className="flex flex-col gap-1.5">
-      <label className="text-xs font-medium opacity-50" style={{ color: 'var(--color-text)' }}>
-        {label}
-      </label>
-      {children}
-    </div>
-  );
-}
-
-const inputBase =
-  'w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm outline-none transition-colors placeholder:opacity-30 focus:border-blue-400/60 focus:bg-white/8';
-
-function TextInput({
-  value,
-  onChange,
-  placeholder,
-  className = '',
-  monospace = false,
-}: {
-  value: string;
-  onChange: (v: string) => void;
-  placeholder?: string;
-  className?: string;
-  monospace?: boolean;
-}) {
-  return (
-    <input
-      type="text"
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      placeholder={placeholder}
-      className={`${inputBase} ${monospace ? 'font-mono text-xs' : ''} ${className}`}
-      style={{ color: 'var(--color-text)' }}
-    />
-  );
-}
-
-function TextArea({
-  value,
-  onChange,
-  rows = 4,
-  monospace = false,
-  placeholder,
-}: {
-  value: string;
-  onChange: (v: string) => void;
-  rows?: number;
-  monospace?: boolean;
-  placeholder?: string;
-}) {
-  return (
-    <textarea
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      rows={rows}
-      placeholder={placeholder}
-      className={`${inputBase} resize-y leading-relaxed ${monospace ? 'font-mono text-xs' : ''}`}
-      style={{ color: 'var(--color-text)' }}
-    />
-  );
-}
-
-function ToggleRow({
-  label,
-  checked,
-  onChange,
-}: {
-  label: string;
-  checked: boolean;
-  onChange: (checked: boolean) => void;
-}) {
-  return (
-    <label
-      className="flex items-center justify-between rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm"
-      style={{ color: 'var(--color-text)' }}
-    >
-      <span>{label}</span>
-      <input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} className="h-4 w-4 accent-blue-400" />
-    </label>
-  );
-}
-
-function ColorRow({
-  label,
-  value,
-  onChange,
-}: {
-  label: string;
-  value: string;
-  onChange: (v: string) => void;
-}) {
-  return (
-    <Field label={label}>
-      <div className="flex items-center gap-2">
-        <input
-          type="color"
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          className="h-8 w-8 cursor-pointer rounded-lg border border-white/10 bg-transparent p-0.5"
-        />
-        <TextInput value={value} onChange={onChange} monospace className="flex-1" />
-      </div>
-    </Field>
-  );
-}
-
-function Toggle({ checked, onChange }: { checked: boolean; onChange: (checked: boolean) => void }) {
-  return (
-    <button
-      type="button"
-      role="switch"
-      aria-checked={checked}
-      onClick={() => onChange(!checked)}
-      className={`relative h-5 w-10 rounded-full transition-colors duration-200 ${checked ? 'bg-blue-500' : 'bg-white/10'}`}
-    >
-      <span
-        className={`absolute left-0.5 top-0.5 h-4 w-4 rounded-full bg-white shadow transition-transform duration-200 ${
-          checked ? 'translate-x-5' : 'translate-x-0'
-        }`}
-      />
-    </button>
-  );
-}
-
-function toHexSafe(color: string): string {
-  if (/^#[0-9a-f]{6}$/i.test(color)) return color;
-
-  const rgbMatch = color.match(/^rgba?\(([^)]+)\)$/i);
-  if (!rgbMatch) return '#000000';
-
-  const [r, g, b] = rgbMatch[1]
-    .split(',')
-    .slice(0, 3)
-    .map((part) => Number(part.trim()));
-
-  if ([r, g, b].some((value) => !Number.isFinite(value))) {
-    return '#000000';
-  }
-
-  return `#${[r, g, b]
-    .map((value) => Math.max(0, Math.min(255, Math.round(value))).toString(16).padStart(2, '0'))
-    .join('')}`;
-}
-
 function ContentForm({ module }: { module: ModuleInstance }) {
-  switch (module.type) {
-    case 'profile':
-      return <ProfileForm module={module} />;
-    case 'html_block':
-      return <HtmlBlockForm module={module} />;
-    case 'github_plugin':
-      return <GithubPluginForm module={module} />;
-    default:
-      return <JsonEditor module={module} />;
+  const definition = getModuleDefinition(module.type);
+  if (definition) {
+    const Form = definition.ConfigForm;
+    return <Form module={module} />;
   }
+  return <JsonEditor module={module} />;
 }
 
 function FormForModule({ module }: { module: ModuleInstance }) {
