@@ -3,26 +3,10 @@
 import React, { useCallback } from 'react';
 import { ResponsiveGridLayout, useContainerWidth, noCompactor } from 'react-grid-layout';
 import type { Layout, ResponsiveLayouts } from 'react-grid-layout';
-import { useAppStore, LayoutRect, Breakpoint } from '@/store/useAppStore';
+import { useAppStore, LayoutRect, Breakpoint, BREAKPOINTS, COLS } from '@/store/useAppStore';
 import { ModuleWrapper } from '@/components/modules/ModuleWrapper';
 import 'react-grid-layout/css/styles.css';
 import 'react-resizable/css/styles.css';
-
-const BREAKPOINTS: Record<Breakpoint, number> = {
-  xl: 1600,
-  lg: 1200,
-  md: 996,
-  sm: 768,
-  xs: 480,
-};
-
-const COLS: Record<Breakpoint, number> = {
-  xl: 12,
-  lg: 12,
-  md: 10,
-  sm: 6,
-  xs: 4,
-};
 
 export function ResponsiveGrid() {
   const { pageConfig, isEditMode, updateLayouts, bringModuleToFront } = useAppStore();

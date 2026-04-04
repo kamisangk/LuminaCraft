@@ -4,6 +4,22 @@ export type ModuleCategory = 'core' | 'plugin';
 export type Breakpoint = 'xl' | 'lg' | 'md' | 'sm' | 'xs';
 export type BackgroundType = 'color' | 'image' | 'video' | 'html' | 'transparent';
 
+export const BREAKPOINTS: Record<Breakpoint, number> = {
+  xl: 1600,
+  lg: 1200,
+  md: 996,
+  sm: 768,
+  xs: 480,
+};
+
+export const COLS: Record<Breakpoint, number> = {
+  xl: 12,
+  lg: 12,
+  md: 10,
+  sm: 6,
+  xs: 4,
+};
+
 export interface GithubPluginSettings {
   username?: string;
   showProfile?: boolean;
@@ -383,17 +399,41 @@ export const useAppStore = create<AppStore>((set) => ({
   setPageConfig: (config) => set({ pageConfig: normalizePageConfig(config) }),
 
   updateLayouts: (newLayouts) =>
-    set((state) => ({
-      pageConfig: {
-        ...state.pageConfig,
-        layouts: {
-          ...state.pageConfig.layouts,
-          ...(Object.fromEntries(
-            Object.entries(newLayouts).map(([k, v]) => [k, v])
-          ) as Record<Breakpoint, LayoutRect[]>),
+    set((state) => {
+      const activeBreakpoint = Object.keys(newLayouts)[0] as Breakpoint;
+      const activeLayout = newLayouts[activeBreakpoint];
+      if (!activeLayout) {
+        return {
+          pageConfig: {
+            ...state.pageConfig,
+            layouts: { ...state.pageConfig.layouts, ...newLayouts } as Record<Breakpoint, LayoutRect[]>,
+          },
+        };
+      }
+      const updatedLayouts = { ...state.pageConfig.layouts };
+
+      (Object.keys(updatedLayouts) as Breakpoint[]).forEach((bp) => {
+        if (bp === activeBreakpoint) {
+          updatedLayouts[bp] = activeLayout;
+        } else {
+          const scale = COLS[bp] / COLS[activeBreakpoint];
+          updatedLayouts[bp] = activeLayout.map((rect) => ({
+            ...rect,
+            x: Math.min(Math.round(rect.x * scale), COLS[bp] - 1),
+            y: Math.round(rect.y * scale),
+            w: Math.max(1, Math.min(Math.round(rect.w * scale), COLS[bp])),
+            h: Math.max(1, Math.round(rect.h * scale)),
+          }));
+        }
+      });
+
+      return {
+        pageConfig: {
+          ...state.pageConfig,
+          layouts: updatedLayouts,
         },
-      },
-    })),
+      };
+    }),
 
   openModulePanel: (id) => set({ activePanelModuleId: id }),
 
@@ -446,7 +486,7 @@ export const useAppStore = create<AppStore>((set) => ({
   addModule: (module) =>
     set((state) => {
       const normalizedModule = normalizeModule(module, state.pageConfig.appearance);
-      const defaultRect = (id: string): LayoutRect => ({ i: id, x: 0, y: Infinity, w: 4, h: 5 });
+      const defaultRect = (id: string): LayoutRect => ({ i: id, x: 0, y: 9999, w: 4, h: 5 });
       const updatedLayouts = Object.fromEntries(
         Object.entries(state.pageConfig.layouts).map(([bp, rects]) => [
           bp,
