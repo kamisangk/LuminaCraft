@@ -81,6 +81,10 @@ export default function HomePage() {
     toggleEditMode();
   }, [setAuthenticated, toggleEditMode]);
 
+  const pageConfigRef = useRef(pageConfig);
+  pageConfigRef.current = pageConfig;
+  const configLoadedRef = useRef(false);
+
   useEffect(() => {
     fetch('/api/config')
       .then((res) => (res.ok ? res.json() : null))
@@ -89,6 +93,7 @@ export default function HomePage() {
       })
       .catch(() => {})
       .finally(() => {
+        configLoadedRef.current = true;
         setConfigReady(true);
       });
   }, [setPageConfig]);
@@ -107,16 +112,41 @@ export default function HomePage() {
       });
   }, [setAuthenticated]);
 
+  const flushSave = useCallback((config: PageConfig) => {
+    return fetch('/api/config', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-lumina-owner': 'local' },
+      body: JSON.stringify(config),
+    });
+  }, []);
+
+  const prevEditModeRef = useRef(isEditMode);
+
   useEffect(() => {
-    if (!isEditMode) return;
+    const wasEditMode = prevEditModeRef.current;
+    prevEditModeRef.current = isEditMode;
+
+    // 退出编辑模式时，立刻执行最终保存
+    if (wasEditMode && !isEditMode) {
+      setSaveStatus('saving');
+      flushSave(pageConfigRef.current)
+        .then((res) => {
+          if (res.ok) setSaveStatus('saved');
+          else if (res.status === 401) {
+            setAuthenticated(false);
+            setSaveStatus('idle');
+          }
+        })
+        .catch(() => setSaveStatus('idle'));
+      return;
+    }
+
+    if (!isEditMode || !configLoadedRef.current) return;
+
     setSaveStatus('saving');
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
     saveTimerRef.current = setTimeout(() => {
-      fetch('/api/config', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-lumina-owner': 'local' },
-        body: JSON.stringify(pageConfig),
-      })
+      flushSave(pageConfigRef.current)
         .then((res) => {
           if (res.ok) setSaveStatus('saved');
           else if (res.status === 401) {
@@ -129,7 +159,7 @@ export default function HomePage() {
     return () => {
       if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
     };
-  }, [pageConfig, isEditMode, setAuthenticated]);
+  }, [pageConfig, isEditMode, setAuthenticated, flushSave]);
 
   return (
     <main className="relative min-h-screen w-full overflow-hidden">
