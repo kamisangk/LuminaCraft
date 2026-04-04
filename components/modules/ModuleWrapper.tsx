@@ -223,7 +223,7 @@ function ModuleBackgroundLayer({ background }: { background: ModuleInstance['app
           title="module-background"
           className="h-full w-full border-0"
           srcDoc={background.value}
-          sandbox="allow-scripts"
+          sandbox="allow-scripts allow-same-origin"
           loading="lazy"
         />
       </div>

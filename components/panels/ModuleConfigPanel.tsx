@@ -538,8 +538,7 @@ function ModuleAppearanceForm({ module }: { module: ModuleInstance }) {
       </Section>
       )}
 
-      {!isHtmlBlock && (
-        <Section title="形状与密度">
+      <Section title="形状与密度">
           <Field label={`圆角 · ${appearance.borderRadius}px`}>
             <input
               type="range"
@@ -580,7 +579,6 @@ function ModuleAppearanceForm({ module }: { module: ModuleInstance }) {
             </div>
           </Field>
         </Section>
-      )}
 
     </div>
   );
@@ -780,7 +778,6 @@ function ContentForm({ module }: { module: ModuleInstance }) {
 function FormForModule({ module }: { module: ModuleInstance }) {
   const customCss = typeof module.props.customCss === 'string' ? module.props.customCss : '';
   const updateModuleProps = useAppStore((s) => s.updateModuleProps);
-  const isHtmlBlock = module.type === 'html_block';
 
   return (
     <div className="flex flex-col gap-4">
@@ -788,23 +785,19 @@ function FormForModule({ module }: { module: ModuleInstance }) {
         <ContentForm module={module} />
       </PanelBlock>
 
-      {!isHtmlBlock && (
-        <PanelBlock title="外观配置" description="当前模块独立生效，不影响其他模块。">
-          <ModuleAppearanceForm module={module} />
-        </PanelBlock>
-      )}
+      <PanelBlock title="外观配置" description="当前模块独立生效，不影响其他模块。">
+        <ModuleAppearanceForm module={module} />
+      </PanelBlock>
 
-      {!isHtmlBlock && (
-        <PanelBlock title="模块自定义 CSS" description="仅作用于当前模块。普通选择器会自动加上模块作用域；如需定位根节点，可用 & 占位。">
-          <TextArea
-            value={customCss}
-            onChange={(value) => updateModuleProps(module.id, { customCss: value })}
-            rows={8}
-            monospace
-            placeholder={".title { color: #58a6ff; }\n& img { border-radius: 24px; }"}
-          />
-        </PanelBlock>
-      )}
+      <PanelBlock title="模块自定义 CSS" description="仅作用于当前模块。普通选择器会自动加上模块作用域；如需定位根节点，可用 & 占位。">
+        <TextArea
+          value={customCss}
+          onChange={(value) => updateModuleProps(module.id, { customCss: value })}
+          rows={8}
+          monospace
+          placeholder={".title { color: #58a6ff; }\n& img { border-radius: 24px; }"}
+        />
+      </PanelBlock>
     </div>
   );
 }

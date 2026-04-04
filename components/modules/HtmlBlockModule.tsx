@@ -61,7 +61,7 @@ export function HtmlBlockModule({ module }: { module: ModuleInstance }) {
       title={module.title || 'html-block'}
       className="h-full w-full border-0"
       src={blobUrl}
-      sandbox="allow-scripts"
+      sandbox="allow-scripts allow-same-origin"
     />
   );
 }
