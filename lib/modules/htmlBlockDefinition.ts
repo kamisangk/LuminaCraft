@@ -1,6 +1,9 @@
 import type { ModuleDefinition } from '../moduleRegistry';
-import { HtmlBlockModule } from '@/components/modules/HtmlBlockModule';
+import { lazy } from 'react';
 import { HtmlBlockForm } from '@/components/modules/HtmlBlockForm';
+import { DEFAULT_HTML_BLOCK_CONTENT } from './htmlBlockDefaults';
+
+const HtmlBlockModule = lazy(() => import('@/components/modules/HtmlBlockModule').then(m => ({ default: m.HtmlBlockModule })));
 
 export const htmlBlockDefinition: ModuleDefinition = {
   type: 'html_block',
@@ -8,14 +11,14 @@ export const htmlBlockDefinition: ModuleDefinition = {
   category: 'core',
   description: '支持完整 HTML 文档的自定义内容块',
   defaultProps: {
-    htmlContent:
-      '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:#e6edf3;font-size:18px;">Hello, World!</div>',
+    htmlContent: DEFAULT_HTML_BLOCK_CONTENT,
   },
   defaultAppearance: {
+    themePreset: 'default',
     colors: {
-      primary: '#22c55e',
+      primary: '#000000',
       surface: 'rgba(10, 14, 23, 0.92)',
-      text: '#e5eefc',
+      text: '#000000',
     },
     background: {
       type: 'color',
@@ -27,6 +30,7 @@ export const htmlBlockDefinition: ModuleDefinition = {
     borderRadius: 18,
     padding: 12,
     shadow: 'soft',
+    showBorder: true,
   },
   appearanceConfig: {
     showColorSection: false,

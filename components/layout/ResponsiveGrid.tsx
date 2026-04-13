@@ -8,8 +8,14 @@ import { ModuleWrapper } from '@/components/modules/ModuleWrapper';
 import 'react-grid-layout/css/styles.css';
 import 'react-resizable/css/styles.css';
 
-export function ResponsiveGrid() {
-  const { pageConfig, isEditMode, updateLayouts, bringModuleToFront } = useAppStore();
+interface ResponsiveGridProps {
+  editModeOverride?: boolean;
+}
+
+export function ResponsiveGrid({ editModeOverride }: ResponsiveGridProps) {
+  const { pageConfig, updateLayouts, bringModuleToFront } = useAppStore();
+  const storeEditMode = useAppStore((s) => s.isEditMode);
+  const isEditMode = editModeOverride ?? storeEditMode;
   const { layouts, modules } = pageConfig;
 
   const { width, containerRef } = useContainerWidth();
@@ -88,7 +94,7 @@ export function ResponsiveGrid() {
       >
         {modules.map((mod) => (
           <div key={mod.id}>
-            <ModuleWrapper module={mod} />
+            <ModuleWrapper module={mod} editModeOverride={isEditMode} />
           </div>
         ))}
       </ResponsiveGridLayout>

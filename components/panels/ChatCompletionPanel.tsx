@@ -140,10 +140,11 @@ export function ChatCompletionPanel() {
             type: 'html_block',
             title: 'AI 生成 HTML',
             appearance: {
+              themePreset: 'default',
               colors: {
-                primary: '#58a6ff',
+                primary: '#000000',
                 surface: 'rgba(22, 27, 34, 0.85)',
-                text: '#e6edf3',
+                text: '#000000',
               },
               background: {
                 type: 'color',
@@ -155,6 +156,7 @@ export function ChatCompletionPanel() {
               borderRadius: 16,
               padding: 16,
               shadow: 'medium',
+              showBorder: true,
             },
             props: { htmlContent: data.result },
           });
@@ -194,7 +196,7 @@ export function ChatCompletionPanel() {
               Chat Completion
             </h3>
           </div>
-          <button
+          <button type="button"
             onClick={closeChatCompletion}
             className="w-8 h-8 rounded-lg flex items-center justify-center text-white/40 hover:text-white/80 hover:bg-white/5 transition-colors"
             aria-label="关闭"
@@ -256,7 +258,7 @@ export function ChatCompletionPanel() {
               <p className="text-[11px] leading-relaxed text-emerald-400/80">当前已保存 API Key，输入新值可覆盖。</p>
             )}
 
-            <button
+            <button type="button"
               onClick={handleSaveConfig}
               disabled={savingConfig || !baseUrl.trim() || !model.trim()}
               className="w-full py-2 rounded-lg text-sm font-medium bg-white/10 text-white hover:bg-white/15 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
@@ -274,7 +276,7 @@ export function ChatCompletionPanel() {
                 { value: 'generate_layout', label: '生成布局' },
                 { value: 'html_block', label: 'HTML Block' },
               ] as const).map((t) => (
-                <button
+                <button type="button"
                   key={t.value}
                   onClick={() => setTask(t.value)}
                   className={`py-1.5 rounded-lg text-[11px] font-medium transition-colors ${
@@ -313,7 +315,7 @@ export function ChatCompletionPanel() {
             />
           </div>
 
-          <button
+          <button type="button"
             onClick={handleSubmit}
             disabled={loading || !prompt.trim()}
             className="w-full py-2 rounded-lg text-sm font-medium bg-purple-500/80 text-white hover:bg-purple-500 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"

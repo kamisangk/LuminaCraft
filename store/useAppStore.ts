@@ -1,8 +1,14 @@
 import { create } from 'zustand';
+import { DEFAULT_HTML_BLOCK_CONTENT } from '@/lib/modules/htmlBlockDefaults';
 
 export type ModuleCategory = 'core' | 'plugin';
 export type Breakpoint = 'xl' | 'lg' | 'md' | 'sm' | 'xs';
 export type BackgroundType = 'color' | 'image' | 'video' | 'html' | 'transparent';
+export type ThemePreset = 'default' | 'liquid-glass' | 'custom';
+export type ModuleThemePreset = ThemePreset;
+export type PageThemePreset = ThemePreset;
+export type LegacyPageThemePreset = 'liquid-glass' | 'skeuomorph' | 'cyberpunk' | 'minimalist';
+export type StoredPageThemePreset = PageThemePreset | LegacyPageThemePreset;
 
 export const BREAKPOINTS: Record<Breakpoint, number> = {
   xl: 1600,
@@ -26,8 +32,11 @@ export interface GithubPluginSettings {
   showStats?: boolean;
   showRepos?: boolean;
   showHeatmap?: boolean;
+  heatmapColor?: string;
   repoLimit?: number;
 }
+
+export const DEFAULT_GITHUB_HEATMAP_COLOR = '#39d353';
 
 export interface LayoutRect {
   i: string;
@@ -39,6 +48,7 @@ export interface LayoutRect {
 }
 
 export interface ModuleAppearance {
+  themePreset: ModuleThemePreset;
   colors: {
     primary: string;
     surface: string;
@@ -53,11 +63,12 @@ export interface ModuleAppearance {
   };
   borderRadius: number;
   padding: number;
-  shadow: 'soft' | 'medium' | 'strong';
+  shadow: 'soft' | 'medium' | 'strong' | 'none';
+  showBorder: boolean;
 }
 
 export interface LegacyPageAppearance {
-  themePreset: 'liquid-glass' | 'skeuomorph' | 'cyberpunk' | 'minimalist' | 'custom';
+  themePreset: StoredPageThemePreset;
   mode: 'light' | 'dark' | 'system';
   colors: { primary: string; surface: string; text: string };
   background: {
@@ -70,6 +81,15 @@ export interface LegacyPageAppearance {
   borderRadius: number;
   customGlobalCss?: string;
 }
+
+export type ResolvedPageAppearance = Omit<LegacyPageAppearance, 'themePreset'> & {
+  themePreset: PageThemePreset;
+};
+
+export type PageAppearancePatch = Partial<Omit<LegacyPageAppearance, 'colors' | 'background'>> & {
+  colors?: Partial<LegacyPageAppearance['colors']>;
+  background?: Partial<LegacyPageAppearance['background']>;
+};
 
 export interface ModuleInstance {
   id: string;
@@ -116,9 +136,9 @@ export interface AppUIState {
 
 const DEFAULT_MODULE_APPEARANCE: ModuleAppearance = {
   colors: {
-    primary: '#58a6ff',
+    primary: '#000000',
     surface: 'rgba(22, 27, 34, 0.85)',
-    text: '#e6edf3',
+    text: '#000000',
   },
   background: {
     type: 'color',
@@ -130,6 +150,8 @@ const DEFAULT_MODULE_APPEARANCE: ModuleAppearance = {
   borderRadius: 16,
   padding: 16,
   shadow: 'medium',
+  showBorder: true,
+  themePreset: 'default',
 };
 
 const DEFAULT_CHAT_COMPLETION_CONFIG: ChatCompletionConfig = {
@@ -149,7 +171,7 @@ function normalizeChatCompletionConfig(config?: Partial<ChatCompletionConfig> | 
 }
 
 const LEGACY_DEFAULT_APPEARANCE: LegacyPageAppearance = {
-  themePreset: 'liquid-glass',
+  themePreset: 'default',
   mode: 'dark',
   colors: {
     primary: '#58a6ff',
@@ -167,6 +189,77 @@ const LEGACY_DEFAULT_APPEARANCE: LegacyPageAppearance = {
   customGlobalCss: '',
 };
 
+const LIQUID_GLASS_PAGE_APPEARANCE: LegacyPageAppearance = {
+  themePreset: 'liquid-glass',
+  mode: 'light',
+  colors: {
+    primary: '#111827',
+    surface: 'rgba(255, 255, 255, 0.18)',
+    text: '#0f172a',
+  },
+  background: {
+    type: 'color',
+    value: '#dfe7f6',
+    blur: 0,
+    opacity: 1,
+    noisePattern: false,
+  },
+  borderRadius: 28,
+  customGlobalCss: '',
+};
+
+export function normalizePageThemePreset(value?: StoredPageThemePreset | null): PageThemePreset {
+  if (value === 'liquid-glass' || value === 'custom' || value === 'default') {
+    return value;
+  }
+  return 'default';
+}
+
+export function createPageAppearance(
+  overrides: PageAppearancePatch = {},
+  current?: Partial<LegacyPageAppearance>
+): LegacyPageAppearance {
+  const source = current ?? LEGACY_DEFAULT_APPEARANCE;
+  const sourceColors = source.colors ?? LEGACY_DEFAULT_APPEARANCE.colors;
+  const sourceBackground = source.background ?? LEGACY_DEFAULT_APPEARANCE.background;
+
+  return {
+    themePreset: normalizePageThemePreset(overrides.themePreset ?? source.themePreset ?? LEGACY_DEFAULT_APPEARANCE.themePreset),
+    mode: overrides.mode ?? source.mode ?? LEGACY_DEFAULT_APPEARANCE.mode,
+    colors: {
+      ...sourceColors,
+      ...overrides.colors,
+    },
+    background: {
+      ...sourceBackground,
+      ...overrides.background,
+    },
+    borderRadius: overrides.borderRadius ?? source.borderRadius ?? LEGACY_DEFAULT_APPEARANCE.borderRadius,
+    customGlobalCss: overrides.customGlobalCss ?? source.customGlobalCss ?? LEGACY_DEFAULT_APPEARANCE.customGlobalCss,
+  };
+}
+
+export function resolvePageAppearance(appearance?: Partial<LegacyPageAppearance>): ResolvedPageAppearance {
+  const normalized = createPageAppearance({}, appearance);
+  const themePreset = normalizePageThemePreset(normalized.themePreset);
+
+  if (themePreset !== 'liquid-glass') {
+    return {
+      ...normalized,
+      themePreset,
+    };
+  }
+
+  return {
+    ...normalized,
+    themePreset,
+    mode: LIQUID_GLASS_PAGE_APPEARANCE.mode,
+    colors: LIQUID_GLASS_PAGE_APPEARANCE.colors,
+    background: LIQUID_GLASS_PAGE_APPEARANCE.background,
+    borderRadius: LIQUID_GLASS_PAGE_APPEARANCE.borderRadius,
+  };
+}
+
 function createModuleAppearance(overrides: Partial<ModuleAppearance> = {}): ModuleAppearance {
   return {
     ...DEFAULT_MODULE_APPEARANCE,
@@ -179,15 +272,45 @@ function createModuleAppearance(overrides: Partial<ModuleAppearance> = {}): Modu
       ...DEFAULT_MODULE_APPEARANCE.background,
       ...overrides.background,
     },
+    shadow: overrides.shadow ?? DEFAULT_MODULE_APPEARANCE.shadow,
+    showBorder: overrides.showBorder ?? DEFAULT_MODULE_APPEARANCE.showBorder,
   };
+}
+
+export function getEffectiveModuleAppearance(
+  appearance: ModuleAppearance
+): ModuleAppearance {
+  if (appearance.themePreset !== 'liquid-glass') {
+    return appearance;
+  }
+
+  return createModuleAppearance({
+    ...appearance,
+    colors: {
+      primary: '#111827',
+      surface: 'rgba(255, 255, 255, 0.18)',
+      text: '#0f172a',
+    },
+    background: {
+      type: 'color',
+      value: 'linear-gradient(180deg, rgba(255,255,255,0.72), rgba(255,255,255,0.22))',
+      blur: 28,
+      opacity: 1,
+      noisePattern: false,
+    },
+    borderRadius: Math.max(appearance.borderRadius, 24),
+    shadow: 'none',
+    showBorder: true,
+  });
 }
 
 function moduleAppearanceFromLegacy(appearance?: Partial<LegacyPageAppearance>): ModuleAppearance {
   if (!appearance) return createModuleAppearance();
+  const normalizedAppearance = createPageAppearance({}, appearance);
   return createModuleAppearance({
-    colors: appearance.colors,
-    background: appearance.background,
-    borderRadius: appearance.borderRadius,
+    colors: normalizedAppearance.colors,
+    background: normalizedAppearance.background,
+    borderRadius: normalizedAppearance.borderRadius,
   });
 }
 
@@ -213,12 +336,17 @@ function normalizeModule(module: ModuleInstance | Record<string, unknown>, legac
 }
 
 function normalizePageConfig(config: PageConfig): PageConfig {
-  const legacyAppearance = config.appearance ?? LEGACY_DEFAULT_APPEARANCE;
+  const legacyAppearance = createPageAppearance({}, config.appearance);
   return {
     ...config,
     chatCompletion: normalizeChatCompletionConfig(config.chatCompletion),
+    appearance: legacyAppearance,
     modules: config.modules.map((module) => normalizeModule(module, legacyAppearance)),
   };
+}
+
+function cloneSerializable<T>(value: T): T {
+  return JSON.parse(JSON.stringify(value)) as T;
 }
 
 const DEFAULT_MODULES: ModuleInstance[] = [
@@ -254,28 +382,7 @@ const DEFAULT_MODULES: ModuleInstance[] = [
       shadow: 'strong',
     }),
     props: {
-      htmlContent: `<style>
-  .terminal { background: #0d1117; color: #58d68d; font-family: 'Courier New', monospace; padding: 16px; border-radius: 8px; height: 100%; box-sizing: border-box; overflow: auto; }
-  .terminal .line { margin: 2px 0; font-size: 13px; }
-  .terminal .prompt { color: #58a6ff; }
-  .terminal .cmd { color: #e6edf3; }
-  .terminal .out { color: #8b949e; }
-  .blink { animation: blink 1s step-end infinite; }
-  @keyframes blink { 50% { opacity: 0; } }
-</style>
-<div class="terminal">
-  <div class="line"><span class="prompt">lumina@craft</span><span class="cmd"> ~ % whoami</span></div>
-  <div class="line out">LuminaCraft - Personal Homepage Builder</div>
-  <div class="line">&nbsp;</div>
-  <div class="line"><span class="prompt">lumina@craft</span><span class="cmd"> ~ % cat features.txt</span></div>
-  <div class="line out">✓ Bento Box Layout Engine</div>
-  <div class="line out">✓ Multi-breakpoint Responsive Grid</div>
-  <div class="line out">✓ Plugin Ecosystem</div>
-  <div class="line out">✓ Chat Completion Design</div>
-  <div class="line out">✓ Module-level Styling</div>
-  <div class="line">&nbsp;</div>
-  <div class="line"><span class="prompt">lumina@craft</span><span class="cmd"> ~ % <span class="blink">█</span></span></div>
-</div>`,
+      htmlContent: DEFAULT_HTML_BLOCK_CONTENT,
     },
   },
   {
@@ -297,13 +404,15 @@ const DEFAULT_MODULES: ModuleInstance[] = [
         showStats: true,
         showRepos: true,
         showHeatmap: false,
+        heatmapColor: DEFAULT_GITHUB_HEATMAP_COLOR,
         repoLimit: 4,
       } satisfies GithubPluginSettings,
     },
   },
 ];
 
-const DEFAULT_PAGE_CONFIG: PageConfig = normalizePageConfig({
+export function createDefaultPageConfig(): PageConfig {
+  return normalizePageConfig({
   version: '1.0.0',
   templateName: 'Bento Geek Dark',
   templateAuthor: 'LuminaCraft',
@@ -314,8 +423,8 @@ const DEFAULT_PAGE_CONFIG: PageConfig = normalizePageConfig({
     favicon: '/favicon.ico',
     language: 'zh-CN',
   },
-  chatCompletion: DEFAULT_CHAT_COMPLETION_CONFIG,
-  appearance: LEGACY_DEFAULT_APPEARANCE,
+  chatCompletion: { ...DEFAULT_CHAT_COMPLETION_CONFIG },
+  appearance: cloneSerializable(LEGACY_DEFAULT_APPEARANCE),
   layouts: {
     xl: [
       { i: 'profile-1', x: 0, y: 0, w: 4, h: 6 },
@@ -343,8 +452,9 @@ const DEFAULT_PAGE_CONFIG: PageConfig = normalizePageConfig({
       { i: 'github-placeholder-1', x: 0, y: 10, w: 4, h: 4 },
     ],
   },
-  modules: DEFAULT_MODULES,
-});
+  modules: cloneSerializable(DEFAULT_MODULES),
+  });
+}
 
 interface AppStore extends AppUIState {
   pageConfig: PageConfig;
@@ -362,6 +472,7 @@ interface AppStore extends AppUIState {
   closeModulePanel: () => void;
   updateModuleProps: (id: string, props: Partial<ModuleInstance['props']>) => void;
   updateModuleAppearance: (id: string, patch: Partial<ModuleAppearance>) => void;
+  updatePageAppearance: (patch: PageAppearancePatch) => void;
   updatePageBackground: (patch: Partial<LegacyPageAppearance['background']>) => void;
   addModule: (module: ModuleInstance) => void;
   removeModule: (id: string) => void;
@@ -387,7 +498,7 @@ export const useAppStore = create<AppStore>((set) => ({
   isSitePanelOpen: false,
   isBackgroundPanelOpen: false,
   isChatCompletionOpen: false,
-  pageConfig: DEFAULT_PAGE_CONFIG,
+  pageConfig: createDefaultPageConfig(),
 
   toggleEditMode: () =>
     set((state) => ({ isEditMode: !state.isEditMode })),
@@ -410,22 +521,13 @@ export const useAppStore = create<AppStore>((set) => ({
           },
         };
       }
-      const updatedLayouts = { ...state.pageConfig.layouts };
 
-      (Object.keys(updatedLayouts) as Breakpoint[]).forEach((bp) => {
-        if (bp === activeBreakpoint) {
-          updatedLayouts[bp] = activeLayout;
-        } else {
-          const scale = COLS[bp] / COLS[activeBreakpoint];
-          updatedLayouts[bp] = activeLayout.map((rect) => ({
-            ...rect,
-            x: Math.min(Math.round(rect.x * scale), COLS[bp] - 1),
-            y: Math.round(rect.y * scale),
-            w: Math.max(1, Math.min(Math.round(rect.w * scale), COLS[bp])),
-            h: Math.max(1, Math.round(rect.h * scale)),
-          }));
-        }
-      });
+      // 只更新当前断点的布局，不自动同步到其他断点
+      // 这样可以保持每个断点的独立布局设计
+      const updatedLayouts = {
+        ...state.pageConfig.layouts,
+        [activeBreakpoint]: activeLayout,
+      };
 
       return {
         pageConfig: {
@@ -469,30 +571,48 @@ export const useAppStore = create<AppStore>((set) => ({
       },
     })),
 
+  updatePageAppearance: (patch) =>
+    set((state) => ({
+      pageConfig: {
+        ...state.pageConfig,
+        appearance: createPageAppearance(patch, state.pageConfig.appearance),
+      },
+    })),
+
   updatePageBackground: (patch) =>
     set((state) => ({
       pageConfig: {
         ...state.pageConfig,
-        appearance: {
-          ...(state.pageConfig.appearance ?? LEGACY_DEFAULT_APPEARANCE),
-          background: {
-            ...(state.pageConfig.appearance?.background ?? LEGACY_DEFAULT_APPEARANCE.background),
-            ...patch,
+        appearance: createPageAppearance(
+          {
+            background: patch,
           },
-        },
+          state.pageConfig.appearance
+        ),
       },
     })),
 
   addModule: (module) =>
     set((state) => {
       const normalizedModule = normalizeModule(module, state.pageConfig.appearance);
-      const defaultRect = (id: string): LayoutRect => ({ i: id, x: 0, y: 9999, w: 4, h: 5 });
+      const defaultRect = (bp: Breakpoint, rects: LayoutRect[], id: string): LayoutRect => {
+        const maxY = rects.reduce((max, rect) => Math.max(max, rect.y + rect.h), 0);
+        return {
+          i: id,
+          x: 0,
+          y: maxY,
+          w: Math.min(4, COLS[bp]),
+          h: 5,
+        };
+      };
+
       const updatedLayouts = Object.fromEntries(
-        Object.entries(state.pageConfig.layouts).map(([bp, rects]) => [
+        (Object.entries(state.pageConfig.layouts) as [Breakpoint, LayoutRect[]][]).map(([bp, rects]) => [
           bp,
-          [...rects, defaultRect(normalizedModule.id)],
+          [...rects, defaultRect(bp, rects, normalizedModule.id)],
         ])
       ) as Record<Breakpoint, LayoutRect[]>;
+
       return {
         pageConfig: {
           ...state.pageConfig,

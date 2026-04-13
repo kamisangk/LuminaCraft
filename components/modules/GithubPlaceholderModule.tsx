@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useMemo, useState } from 'react';
-import { GithubPluginSettings, ModuleInstance } from '@/store/useAppStore';
+import { DEFAULT_GITHUB_HEATMAP_COLOR, GithubPluginSettings, ModuleInstance } from '@/store/useAppStore';
 
 interface GithubUser {
   login: string;
@@ -92,24 +92,28 @@ function StatCard({ label, value }: { label: string; value: number }) {
   );
 }
 
-function getHeatmapCellBackground(level: GithubHeatmapDay['level']) {
+function getHeatmapTint(color: string, strength: number, fallback: string) {
+  return `color-mix(in srgb, ${color} ${strength}%, ${fallback})`;
+}
+
+function getHeatmapCellBackground(level: GithubHeatmapDay['level'], heatmapColor: string) {
   switch (level) {
     case 0:
       return 'rgba(255,255,255,0.06)';
     case 1:
-      return 'color-mix(in srgb, var(--color-primary) 28%, rgba(255,255,255,0.12))';
+      return getHeatmapTint(heatmapColor, 28, 'rgba(255,255,255,0.12)');
     case 2:
-      return 'color-mix(in srgb, var(--color-primary) 48%, rgba(255,255,255,0.14))';
+      return getHeatmapTint(heatmapColor, 48, 'rgba(255,255,255,0.14)');
     case 3:
-      return 'color-mix(in srgb, var(--color-primary) 66%, rgba(255,255,255,0.16))';
+      return getHeatmapTint(heatmapColor, 66, 'rgba(255,255,255,0.16)');
     case 4:
-      return 'color-mix(in srgb, var(--color-primary) 82%, rgba(255,255,255,0.18))';
+      return getHeatmapTint(heatmapColor, 82, 'rgba(255,255,255,0.18)');
     default:
       return 'rgba(255,255,255,0.06)';
   }
 }
 
-function HeatmapCard({ heatmap }: { heatmap: GithubHeatmap }) {
+function HeatmapCard({ heatmap, heatmapColor }: { heatmap: GithubHeatmap; heatmapColor: string }) {
   const days = heatmap.weeks.flatMap((week) => week.days);
   const total = days.reduce((sum, day) => sum + day.count, 0);
   const displayedWeeks = heatmap.weeks;
@@ -170,7 +174,7 @@ function HeatmapCard({ heatmap }: { heatmap: GithubHeatmap }) {
             <span
               key={level}
               style={{
-                background: getHeatmapCellBackground(level as GithubHeatmapDay['level']),
+                background: getHeatmapCellBackground(level as GithubHeatmapDay['level'], heatmapColor),
                 width: legendCellSize,
                 height: legendCellSize,
                 borderRadius: heatmapScaleStyles.cellRadius,
@@ -199,7 +203,7 @@ function HeatmapCard({ heatmap }: { heatmap: GithubHeatmap }) {
                   key={`${weekIndex}-${day.date}`}
                   className="border border-white/5 transition-transform hover:scale-110"
                   style={{
-                    background: getHeatmapCellBackground(day.level),
+                    background: getHeatmapCellBackground(day.level, heatmapColor),
                     width: '100%',
                     aspectRatio: '1 / 1',
                     borderRadius: heatmapScaleStyles.cellRadius,
@@ -293,6 +297,7 @@ export function GithubPlaceholderModule({ module }: { module: ModuleInstance }) 
       showStats: raw.showStats ?? true,
       showRepos: raw.showRepos ?? true,
       showHeatmap: raw.showHeatmap ?? false,
+      heatmapColor: raw.heatmapColor?.trim() || DEFAULT_GITHUB_HEATMAP_COLOR,
       repoLimit: Math.min(Math.max(raw.repoLimit ?? 4, 1), 8),
     } satisfies Required<GithubPluginSettings>;
   }, [module.props.pluginSettings]);
@@ -464,7 +469,7 @@ export function GithubPlaceholderModule({ module }: { module: ModuleInstance }) 
         </div>
       )}
 
-      {settings.showHeatmap && data.heatmap && <HeatmapCard heatmap={data.heatmap} />}
+      {settings.showHeatmap && data.heatmap && <HeatmapCard heatmap={data.heatmap} heatmapColor={settings.heatmapColor} />}
       {settings.showHeatmap && !data.heatmap && data.heatmapError && (
         <div
           className="rounded-xl border border-dashed px-3 py-3 text-xs"

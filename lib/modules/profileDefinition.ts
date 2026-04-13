@@ -1,6 +1,8 @@
 import type { ModuleDefinition } from '../moduleRegistry';
-import { ProfileModule } from '@/components/modules/ProfileModule';
+import { lazy } from 'react';
 import { ProfileForm } from '@/components/modules/ProfileForm';
+
+const ProfileModule = lazy(() => import('@/components/modules/ProfileModule').then(m => ({ default: m.ProfileModule })));
 
 export const profileDefinition: ModuleDefinition = {
   type: 'profile',
@@ -14,10 +16,11 @@ export const profileDefinition: ModuleDefinition = {
     links: [],
   },
   defaultAppearance: {
+    themePreset: 'default',
     colors: {
-      primary: '#58a6ff',
+      primary: '#000000',
       surface: 'rgba(15, 23, 42, 0.88)',
-      text: '#f8fafc',
+      text: '#000000',
     },
     background: {
       type: 'color',
@@ -29,6 +32,7 @@ export const profileDefinition: ModuleDefinition = {
     borderRadius: 20,
     padding: 18,
     shadow: 'medium',
+    showBorder: true,
   },
   appearanceConfig: {
     showColorSection: true,

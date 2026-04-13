@@ -1,7 +1,9 @@
 import type { ModuleDefinition } from '../moduleRegistry';
-import type { GithubPluginSettings } from '@/store/useAppStore';
-import { GithubPlaceholderModule } from '@/components/modules/GithubPlaceholderModule';
+import { DEFAULT_GITHUB_HEATMAP_COLOR, type GithubPluginSettings } from '@/store/useAppStore';
+import { lazy } from 'react';
 import { GithubPluginForm } from '@/components/modules/GithubPluginForm';
+
+const GithubPlaceholderModule = lazy(() => import('@/components/modules/GithubPlaceholderModule').then(m => ({ default: m.GithubPlaceholderModule })));
 
 export const githubPluginDefinition: ModuleDefinition = {
   type: 'github_plugin',
@@ -14,14 +16,17 @@ export const githubPluginDefinition: ModuleDefinition = {
       showProfile: true,
       showStats: true,
       showRepos: true,
+      showHeatmap: false,
+      heatmapColor: DEFAULT_GITHUB_HEATMAP_COLOR,
       repoLimit: 4,
     } satisfies GithubPluginSettings,
   },
   defaultAppearance: {
+    themePreset: 'default',
     colors: {
-      primary: '#8b5cf6',
+      primary: '#000000',
       surface: 'rgba(17, 24, 39, 0.9)',
-      text: '#f8fafc',
+      text: '#000000',
     },
     background: {
       type: 'color',
@@ -33,6 +38,7 @@ export const githubPluginDefinition: ModuleDefinition = {
     borderRadius: 20,
     padding: 16,
     shadow: 'strong',
+    showBorder: true,
   },
   appearanceConfig: {
     showColorSection: true,

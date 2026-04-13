@@ -62,7 +62,7 @@ export function ModuleLibraryPanel() {
               模块库
             </h3>
           </div>
-          <button
+          <button type="button"
             onClick={closeModuleLibrary}
             className="flex h-8 w-8 items-center justify-center rounded-lg text-white/40 transition-colors hover:bg-white/5 hover:text-white/80"
             aria-label="关闭"
@@ -102,7 +102,7 @@ export function ModuleLibraryPanel() {
                   </p>
                 </div>
               </div>
-              <button
+              <button type="button"
                 onClick={() => handleAdd(def)}
                 className="w-full rounded-lg border border-blue-500/20 bg-blue-500/20 py-1.5 text-xs font-medium text-blue-300 transition-colors duration-150 hover:bg-blue-500/40"
               >

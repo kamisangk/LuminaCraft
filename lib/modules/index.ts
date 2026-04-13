@@ -2,6 +2,7 @@ import type { ModuleDefinition } from '../moduleRegistry';
 import { profileDefinition } from './profileDefinition';
 import { htmlBlockDefinition } from './htmlBlockDefinition';
 import { githubPluginDefinition } from './githubPluginDefinition';
+import { imageDefinition } from './imageDefinition';
 
 /**
  * 所有已注册模块定义。新增模块时只需：
@@ -12,6 +13,7 @@ const MODULE_DEFINITIONS: ModuleDefinition[] = [
   profileDefinition,
   htmlBlockDefinition,
   githubPluginDefinition,
+  imageDefinition,
 ];
 
 /** 按 type 查找模块定义 */

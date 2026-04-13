@@ -28,7 +28,8 @@ export function ProfileModule({ module }: { module: ModuleInstance }) {
           alt={name || 'Avatar'}
           fill
           className="object-cover"
-          unoptimized
+          loading="lazy"
+          sizes="80px"
         />
       </div>
       <div>

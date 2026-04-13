@@ -1,7 +1,17 @@
 'use client';
 
 import React, { useMemo, useRef, useState } from 'react';
-import { useAppStore, Breakpoint, LayoutRect, ModuleInstance, PageConfig } from '@/store/useAppStore';
+import {
+  useAppStore,
+  Breakpoint,
+  LayoutRect,
+  ModuleInstance,
+  PageConfig,
+  PageThemePreset,
+  LegacyPageAppearance,
+  createPageAppearance,
+  resolvePageAppearance,
+} from '@/store/useAppStore';
 import { HTML_PRESETS } from './backgroundHtmlPresets';
 
 const HTML_CUSTOM_VALUE = '__custom__';
@@ -13,6 +23,24 @@ const PAGE_BG_TYPE_OPTIONS = [
 const MEDIA_KIND_OPTIONS = [
   { value: 'image', label: '图片' },
   { value: 'video', label: '视频' },
+] as const;
+
+const PAGE_THEME_OPTIONS: { value: PageThemePreset; label: string; description: string }[] = [
+  {
+    value: 'default',
+    label: 'Default',
+    description: 'Keep the current appearance controls and background settings.',
+  },
+  {
+    value: 'liquid-glass',
+    label: '液态玻璃',
+    description: 'Apply the glass preset across the whole page and all modules.',
+  },
+  {
+    value: 'custom',
+    label: 'Custom',
+    description: 'Use global CSS for a fully custom page-level theme.',
+  },
 ] as const;
 
 type PageBackground = NonNullable<PageConfig['appearance']>['background'];
@@ -72,9 +100,28 @@ function normalizeImportedConfig(raw: unknown, currentConfig: PageConfig): PageC
   const appearanceInput = input.appearance && typeof input.appearance === 'object'
     ? (input.appearance as Record<string, unknown>)
     : null;
+  const colorsInput = appearanceInput?.colors && typeof appearanceInput.colors === 'object'
+    ? (appearanceInput.colors as Record<string, unknown>)
+    : null;
   const backgroundInput = appearanceInput?.background && typeof appearanceInput.background === 'object'
     ? (appearanceInput.background as Record<string, unknown>)
     : null;
+  const colorsPatch = colorsInput
+    ? {
+        ...(typeof colorsInput.primary === 'string' ? { primary: colorsInput.primary } : {}),
+        ...(typeof colorsInput.surface === 'string' ? { surface: colorsInput.surface } : {}),
+        ...(typeof colorsInput.text === 'string' ? { text: colorsInput.text } : {}),
+      }
+    : undefined;
+  const backgroundPatch = backgroundInput
+    ? {
+        ...(isPageBackgroundType(backgroundInput.type) ? { type: backgroundInput.type } : {}),
+        ...(typeof backgroundInput.value === 'string' ? { value: backgroundInput.value } : {}),
+        ...(typeof backgroundInput.blur === 'number' ? { blur: backgroundInput.blur } : {}),
+        ...(typeof backgroundInput.opacity === 'number' ? { opacity: backgroundInput.opacity } : {}),
+        ...(typeof backgroundInput.noisePattern === 'boolean' ? { noisePattern: backgroundInput.noisePattern } : {}),
+      }
+    : undefined;
 
   return {
     ...currentConfig,
@@ -94,39 +141,24 @@ function normalizeImportedConfig(raw: unknown, currentConfig: PageConfig): PageC
       favicon: typeof siteInput.favicon === 'string' ? siteInput.favicon : currentConfig.site.favicon,
       language: typeof siteInput.language === 'string' ? siteInput.language : currentConfig.site.language,
     },
-    appearance: backgroundInput
-      ? {
-          themePreset: currentConfig.appearance?.themePreset ?? 'liquid-glass',
-          mode: currentConfig.appearance?.mode ?? 'dark',
-          colors: currentConfig.appearance?.colors ?? {
-            primary: '#58a6ff',
-            surface: 'rgba(22, 27, 34, 0.85)',
-            text: '#e6edf3',
+    appearance: appearanceInput
+      ? createPageAppearance(
+          {
+            ...(typeof appearanceInput.themePreset === 'string'
+              ? { themePreset: appearanceInput.themePreset as LegacyPageAppearance['themePreset'] }
+              : {}),
+            ...(appearanceInput.mode === 'light' || appearanceInput.mode === 'dark' || appearanceInput.mode === 'system'
+              ? { mode: appearanceInput.mode }
+              : {}),
+            ...(colorsPatch ? { colors: colorsPatch } : {}),
+            ...(typeof appearanceInput.borderRadius === 'number' ? { borderRadius: appearanceInput.borderRadius } : {}),
+            ...(typeof appearanceInput.customGlobalCss === 'string'
+              ? { customGlobalCss: appearanceInput.customGlobalCss }
+              : {}),
+            ...(backgroundPatch ? { background: backgroundPatch } : {}),
           },
-          borderRadius: currentConfig.appearance?.borderRadius ?? 16,
-          customGlobalCss: currentConfig.appearance?.customGlobalCss ?? '',
-          background: {
-            type: isPageBackgroundType(backgroundInput.type)
-              ? backgroundInput.type
-              : (currentConfig.appearance?.background?.type ?? 'color'),
-            value:
-              typeof backgroundInput.value === 'string'
-                ? backgroundInput.value
-                : (currentConfig.appearance?.background?.value ?? '#0d1117'),
-            blur:
-              typeof backgroundInput.blur === 'number'
-                ? backgroundInput.blur
-                : (currentConfig.appearance?.background?.blur ?? 0),
-            opacity:
-              typeof backgroundInput.opacity === 'number'
-                ? backgroundInput.opacity
-                : (currentConfig.appearance?.background?.opacity ?? 1),
-            noisePattern:
-              typeof backgroundInput.noisePattern === 'boolean'
-                ? backgroundInput.noisePattern
-                : (currentConfig.appearance?.background?.noisePattern ?? false),
-          },
-        }
+          currentConfig.appearance
+        )
       : currentConfig.appearance,
     layouts,
     modules,
@@ -220,7 +252,7 @@ export function SitePanel() {
               SEO 信息
             </h3>
           </div>
-          <button
+          <button type="button"
             onClick={closeSitePanel}
             className="w-8 h-8 rounded-lg flex items-center justify-center text-white/40 hover:text-white/80 hover:bg-white/5 transition-colors"
             aria-label="关闭"
@@ -239,14 +271,14 @@ export function SitePanel() {
         <div className="flex-1 overflow-y-auto px-4 py-4 flex flex-col gap-4">
           <Field label="模板">
             <div className="flex gap-2">
-              <button
+              <button type="button"
                 onClick={handleExport}
                 className="flex-1 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm transition-colors hover:bg-white/10"
                 style={{ color: 'var(--color-text)' }}
               >
                 导出 JSON
               </button>
-              <button
+              <button type="button"
                 onClick={handleImportClick}
                 className="flex-1 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm transition-colors hover:bg-white/10"
                 style={{ color: 'var(--color-text)' }}
@@ -322,7 +354,7 @@ export function SitePanel() {
   );
 }
 
-export function BackgroundPanel() {
+function BackgroundPanelLegacy() {
   const isOpen = useAppStore((s) => s.isBackgroundPanelOpen);
   const closeBackgroundPanel = useAppStore((s) => s.closeBackgroundPanel);
   const background = useAppStore((s) => s.pageConfig.appearance?.background);
@@ -450,7 +482,7 @@ export function BackgroundPanel() {
               主页背景
             </h3>
           </div>
-          <button
+          <button type="button"
             onClick={closeBackgroundPanel}
             className="w-8 h-8 rounded-lg flex items-center justify-center text-white/40 hover:text-white/80 hover:bg-white/5 transition-colors"
             aria-label="关闭"
@@ -470,7 +502,7 @@ export function BackgroundPanel() {
             <Field label="背景类型">
               <div className="grid grid-cols-3 gap-1">
                 {PAGE_BG_TYPE_OPTIONS.map((type) => (
-                  <button
+                  <button type="button"
                     key={type.value}
                     onClick={() => setBackgroundType(type.value)}
                     className={`rounded-lg py-1.5 text-[11px] font-medium transition-colors ${
@@ -501,9 +533,8 @@ export function BackgroundPanel() {
                 <Field label="媒体类型">
                   <div className="grid grid-cols-2 gap-1">
                     {MEDIA_KIND_OPTIONS.map((option) => (
-                      <button
+                      <button type="button"
                         key={option.value}
-                        type="button"
                         onClick={() => setMediaKind(option.value)}
                         className={`rounded-lg py-1.5 text-[11px] font-medium transition-colors ${
                           mediaKind === option.value
@@ -543,8 +574,7 @@ export function BackgroundPanel() {
               <>
                 <Field label="预设 / 自定义">
                   <div className="relative" ref={htmlPresetMenuRef}>
-                    <button
-                      type="button"
+                    <button type="button"
                       onClick={() => setIsHtmlPresetMenuOpen((open) => !open)}
                       aria-haspopup="listbox"
                       aria-expanded={isHtmlPresetMenuOpen}
@@ -570,8 +600,7 @@ export function BackgroundPanel() {
                         style={{ boxShadow: '0 16px 40px rgba(0,0,0,0.28)' }}
                       >
                         <div className="mb-1 rounded-xl border border-blue-400/15 bg-blue-500/8 p-1">
-                          <button
-                            type="button"
+                          <button type="button"
                             onClick={() => handleHtmlPresetSelect(HTML_CUSTOM_VALUE)}
                             className={`flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm transition-colors ${
                               isCustomHtmlSelected
@@ -592,9 +621,8 @@ export function BackgroundPanel() {
                           {HTML_PRESETS.map((preset) => {
                             const active = matchedHtmlPreset?.name === preset.name;
                             return (
-                              <button
+                              <button type="button"
                                 key={preset.name}
-                                type="button"
                                 onClick={() => handleHtmlPresetSelect(preset.name)}
                                 className={`flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm transition-colors ${
                                   active
@@ -669,6 +697,415 @@ export function BackgroundPanel() {
   );
 }
 
+function BackgroundThemePanel() {
+  const isOpen = useAppStore((s) => s.isBackgroundPanelOpen);
+  const closeBackgroundPanel = useAppStore((s) => s.closeBackgroundPanel);
+  const rawAppearance = useAppStore((s) => s.pageConfig.appearance);
+  const updatePageAppearance = useAppStore((s) => s.updatePageAppearance);
+  const updatePageBackground = useAppStore((s) => s.updatePageBackground);
+  const appearance = useMemo(() => resolvePageAppearance(rawAppearance), [rawAppearance]);
+  const background = appearance.background;
+  const themePreset = appearance.themePreset;
+  const [customHtml, setCustomHtml] = useState(background.type === 'html' ? background.value : '');
+  const [isHtmlPresetMenuOpen, setIsHtmlPresetMenuOpen] = useState(false);
+  const htmlPresetMenuRef = useRef<HTMLDivElement>(null);
+  const matchedHtmlPreset = useMemo(
+    () => (background.type === 'html' ? HTML_PRESETS.find((preset) => preset.html === background.value) ?? null : null),
+    [background.type, background.value]
+  );
+  const htmlSelectValue = matchedHtmlPreset?.name ?? HTML_CUSTOM_VALUE;
+  const isCustomHtmlSelected = htmlSelectValue === HTML_CUSTOM_VALUE;
+  const backgroundUiType = background.type === 'image' || background.type === 'video' ? 'media' : background.type;
+  const mediaKind = background.type === 'video' ? 'video' : 'image';
+  const customGlobalCss = rawAppearance?.customGlobalCss ?? '';
+
+  React.useEffect(() => {
+    if (background.type === 'html' && !matchedHtmlPreset) {
+      setCustomHtml(background.value);
+    }
+  }, [background.type, background.value, matchedHtmlPreset]);
+
+  React.useEffect(() => {
+    if (!isHtmlPresetMenuOpen) return;
+
+    const handlePointerDown = (event: PointerEvent) => {
+      if (!htmlPresetMenuRef.current?.contains(event.target as Node)) {
+        setIsHtmlPresetMenuOpen(false);
+      }
+    };
+
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setIsHtmlPresetMenuOpen(false);
+      }
+    };
+
+    document.addEventListener('pointerdown', handlePointerDown);
+    document.addEventListener('keydown', handleEscape);
+
+    return () => {
+      document.removeEventListener('pointerdown', handlePointerDown);
+      document.removeEventListener('keydown', handleEscape);
+    };
+  }, [isHtmlPresetMenuOpen]);
+
+  const setBackground = (key: keyof PageBackground, value: unknown) => {
+    updatePageBackground({ [key]: value } as Partial<PageBackground>);
+  };
+
+  const setBackgroundType = (type: PageBackground['type'] | 'media') => {
+    const resolvedType = type === 'media' ? (background.type === 'video' ? 'video' : 'image') : type;
+    const nextValue =
+      resolvedType === 'color'
+        ? '#0d1117'
+        : resolvedType === 'html'
+          ? customHtml || HTML_PRESETS[0]?.html || ''
+          : resolvedType === 'transparent'
+            ? ''
+            : background.type === resolvedType
+              ? background.value
+              : '';
+
+    updatePageBackground({ type: resolvedType, value: nextValue });
+
+    if (resolvedType === 'html' && !customHtml) {
+      setCustomHtml(nextValue);
+    }
+  };
+
+  const setMediaKind = (type: 'image' | 'video') => {
+    updatePageBackground({
+      type,
+      value: background.type === 'image' || background.type === 'video' ? background.value : '',
+    });
+  };
+
+  const applyHtmlPreset = (html: string) => {
+    updatePageBackground({ type: 'html', value: html });
+  };
+
+  const handleHtmlPresetSelect = (value: string) => {
+    setIsHtmlPresetMenuOpen(false);
+
+    if (value === HTML_CUSTOM_VALUE) {
+      const nextValue = customHtml || background.value || HTML_PRESETS[0]?.html || '';
+      setCustomHtml(nextValue);
+      updatePageBackground({ type: 'html', value: nextValue });
+      return;
+    }
+
+    const preset = HTML_PRESETS.find((item) => item.name === value);
+    if (preset) {
+      applyHtmlPreset(preset.html);
+    }
+  };
+
+  const handleCustomHtml = (value: string) => {
+    setCustomHtml(value);
+    updatePageBackground({ type: 'html', value });
+  };
+
+  return (
+    <>
+      {isOpen && (
+        <div
+          className="fixed inset-0 z-40 bg-black/30 backdrop-blur-[2px]"
+          onClick={closeBackgroundPanel}
+        />
+      )}
+
+      <div
+        className={`fixed top-0 right-0 z-50 h-full w-80 flex flex-col transition-transform duration-300 ease-in-out ${
+          isOpen ? 'translate-x-0' : 'translate-x-full'
+        }`}
+        style={{
+          background: 'rgba(13,17,23,0.97)',
+          backdropFilter: 'blur(24px) saturate(180%)',
+          borderLeft: '1px solid rgba(255,255,255,0.08)',
+          boxShadow: isOpen ? '-8px 0 40px rgba(0,0,0,0.5)' : 'none',
+        }}
+      >
+        <div
+          className="flex items-center justify-between px-4 py-3 border-b"
+          style={{ borderColor: 'rgba(255,255,255,0.08)' }}
+        >
+          <div>
+            <p className="text-xs opacity-40" style={{ color: 'var(--color-text)' }}>Page Settings</p>
+            <h3 className="text-sm font-semibold mt-0.5" style={{ color: 'var(--color-text)' }}>
+              Appearance
+            </h3>
+          </div>
+          <button
+            type="button"
+            onClick={closeBackgroundPanel}
+            className="w-8 h-8 rounded-lg flex items-center justify-center text-white/40 hover:text-white/80 hover:bg-white/5 transition-colors"
+            aria-label="Close"
+          >
+            <svg viewBox="0 0 20 20" className="w-4 h-4 fill-current" aria-hidden="true">
+              <path
+                fillRule="evenodd"
+                d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"
+                clipRule="evenodd"
+              />
+            </svg>
+          </button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto px-4 py-4 flex flex-col gap-4">
+          <Section title="Theme">
+            <Field label="Preset">
+              <div className="flex flex-col gap-2">
+                {PAGE_THEME_OPTIONS.map((option) => {
+                  const active = themePreset === option.value;
+
+                  return (
+                    <button
+                      type="button"
+                      key={option.value}
+                      onClick={() => updatePageAppearance({ themePreset: option.value })}
+                      className={`rounded-xl border px-3 py-3 text-left transition-colors ${
+                        active
+                          ? 'border-blue-400/50 bg-blue-500/15'
+                          : 'border-white/10 bg-white/5 hover:border-white/20 hover:bg-white/8'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="text-sm font-medium" style={{ color: 'var(--color-text)' }}>
+                          {option.label}
+                        </span>
+                        {active && (
+                          <span className="rounded-full bg-blue-500/20 px-2 py-0.5 text-[10px] uppercase tracking-[0.18em] text-blue-200">
+                            Active
+                          </span>
+                        )}
+                      </div>
+                      <p className="mt-1 text-[11px] leading-relaxed opacity-60" style={{ color: 'var(--color-text)' }}>
+                        {option.description}
+                      </p>
+                    </button>
+                  );
+                })}
+              </div>
+            </Field>
+
+            {themePreset === 'liquid-glass' && (
+              <p className="text-[11px] leading-relaxed opacity-60" style={{ color: 'var(--color-text)' }}>
+                The glass preset is active. Switch back to `Default` to edit the regular background controls.
+              </p>
+            )}
+
+            {themePreset === 'custom' && (
+              <Field label="Custom Global CSS">
+                <textarea
+                  value={customGlobalCss}
+                  onChange={(e) => updatePageAppearance({ customGlobalCss: e.target.value })}
+                  rows={10}
+                  placeholder="[data-page-theme=&quot;custom&quot;] { }"
+                  className="w-full rounded-lg px-3 py-2 text-xs outline-none bg-white/5 border border-white/10 focus:border-blue-400/60 transition-colors font-mono resize-none leading-relaxed"
+                  style={{ color: 'var(--color-text)' }}
+                />
+                <p className="text-[10px] opacity-40" style={{ color: 'var(--color-text)' }}>
+                  Applied to both `/` and `/admin`. Use `[data-page-theme=&quot;custom&quot;]` to scope your rules if needed.
+                </p>
+              </Field>
+            )}
+          </Section>
+
+          {themePreset === 'default' && (
+            <Section title="Background">
+              <Field label="Background Type">
+                <div className="grid grid-cols-3 gap-1">
+                  {PAGE_BG_TYPE_OPTIONS.map((type) => (
+                    <button
+                      type="button"
+                      key={type.value}
+                      onClick={() => setBackgroundType(type.value)}
+                      className={`rounded-lg py-1.5 text-[11px] font-medium transition-colors ${
+                        backgroundUiType === type.value
+                          ? 'bg-blue-500 text-white'
+                          : 'bg-white/5 text-white/50 hover:bg-white/10 hover:text-white/80'
+                      }`}
+                    >
+                      {type.label}
+                    </button>
+                  ))}
+                </div>
+              </Field>
+
+              {backgroundUiType === 'color' && (
+                <Field label="Background Color">
+                  <input
+                    type="color"
+                    value={toHexSafe(background.value)}
+                    onChange={(e) => setBackground('value', e.target.value)}
+                    className="h-10 w-full rounded-lg border border-white/10 bg-transparent"
+                  />
+                </Field>
+              )}
+
+              {backgroundUiType === 'media' && (
+                <>
+                  <Field label="Media Type">
+                    <div className="grid grid-cols-2 gap-1">
+                      {MEDIA_KIND_OPTIONS.map((option) => (
+                        <button
+                          type="button"
+                          key={option.value}
+                          onClick={() => setMediaKind(option.value)}
+                          className={`rounded-lg py-1.5 text-[11px] font-medium transition-colors ${
+                            mediaKind === option.value
+                              ? 'bg-blue-500 text-white'
+                              : 'bg-white/5 text-white/50 hover:bg-white/10 hover:text-white/80'
+                          }`}
+                        >
+                          {option.label}
+                        </button>
+                      ))}
+                    </div>
+                  </Field>
+
+                  <Field label={mediaKind === 'image' ? 'Image URL' : 'Video URL'}>
+                    <TextInput
+                      value={background.value}
+                      onChange={(v) => setBackground('value', v)}
+                      placeholder={mediaKind === 'image' ? 'https://example.com/bg.jpg' : 'https://example.com/bg.mp4'}
+                    />
+                  </Field>
+
+                  {mediaKind === 'image' && background.value && (
+                    <div
+                      className="h-16 w-full rounded-lg border border-white/10 bg-cover bg-center"
+                      style={{ backgroundImage: `url(${background.value})` }}
+                    />
+                  )}
+                </>
+              )}
+
+              {background.type === 'html' && (
+                <>
+                  <Field label="Preset / Custom">
+                    <div className="relative" ref={htmlPresetMenuRef}>
+                      <button
+                        type="button"
+                        onClick={() => setIsHtmlPresetMenuOpen((open) => !open)}
+                        aria-haspopup="listbox"
+                        aria-expanded={isHtmlPresetMenuOpen}
+                        className="flex w-full items-center justify-between rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm outline-none transition-colors hover:border-white/20 hover:bg-white/10 focus:border-blue-400/60 focus:ring-2 focus:ring-blue-400/20"
+                        style={{ color: 'var(--color-text)', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.04), 0 8px 24px rgba(0,0,0,0.18)' }}
+                      >
+                        <span className="truncate text-left">{matchedHtmlPreset?.name ?? 'Custom'}</span>
+                        <svg
+                          viewBox="0 0 20 20"
+                          className={`h-4 w-4 flex-shrink-0 fill-current text-white/45 transition-transform duration-200 ${isHtmlPresetMenuOpen ? 'rotate-180' : ''}`}
+                          aria-hidden="true"
+                        >
+                          <path
+                            fillRule="evenodd"
+                            d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.51a.75.75 0 01-1.08 0l-4.25-4.51a.75.75 0 01.02-1.06z"
+                            clipRule="evenodd"
+                          />
+                        </svg>
+                      </button>
+                      {isHtmlPresetMenuOpen && (
+                        <div
+                          className="absolute left-0 right-0 top-[calc(100%+0.375rem)] z-20 overflow-hidden rounded-lg border border-white/10 bg-[#0d1117]/95 p-1 shadow-xl backdrop-blur-sm"
+                          style={{ boxShadow: '0 16px 40px rgba(0,0,0,0.28)' }}
+                        >
+                          <div className="mb-1 rounded-xl border border-blue-400/15 bg-blue-500/8 p-1">
+                            <button
+                              type="button"
+                              onClick={() => handleHtmlPresetSelect(HTML_CUSTOM_VALUE)}
+                              className={`flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm transition-colors ${
+                                isCustomHtmlSelected
+                                  ? 'bg-blue-500/20 text-blue-200'
+                                  : 'text-white/80 hover:bg-white/6 hover:text-white'
+                              }`}
+                            >
+                              <span>Custom</span>
+                              {isCustomHtmlSelected && <span className="text-[11px] text-blue-300/80">Current</span>}
+                            </button>
+                          </div>
+                          <div className="mx-2 mb-1 flex items-center gap-2 px-1">
+                            <div className="h-px flex-1 bg-white/10" />
+                            <span className="text-[10px] uppercase tracking-[0.24em] text-white/30">Presets</span>
+                            <div className="h-px flex-1 bg-white/10" />
+                          </div>
+                          <div className="max-h-64 overflow-y-auto rounded-xl bg-white/[0.02] p-1">
+                            {HTML_PRESETS.map((preset) => {
+                              const active = matchedHtmlPreset?.name === preset.name;
+                              return (
+                                <button
+                                  type="button"
+                                  key={preset.name}
+                                  onClick={() => handleHtmlPresetSelect(preset.name)}
+                                  className={`flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm transition-colors ${
+                                    active
+                                      ? 'bg-blue-500/18 text-blue-200'
+                                      : 'text-white/75 hover:bg-white/6 hover:text-white'
+                                  }`}
+                                >
+                                  <span>{preset.name}</span>
+                                  {active && <span className="text-[11px] text-blue-300/80">Current</span>}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </Field>
+
+                  {isCustomHtmlSelected && (
+                    <Field label="Custom HTML">
+                      <textarea
+                        value={customHtml}
+                        onChange={(e) => handleCustomHtml(e.target.value)}
+                        rows={8}
+                        placeholder="<!DOCTYPE html><html>...</html>"
+                        className="w-full rounded-lg px-3 py-2 text-xs outline-none bg-white/5 border border-white/10 focus:border-blue-400/60 transition-colors font-mono resize-none leading-relaxed"
+                        style={{ color: 'var(--color-text)' }}
+                      />
+                    </Field>
+                  )}
+                </>
+              )}
+
+              <Field label={`Opacity · ${Math.round(background.opacity * 100)}%`}>
+                <input
+                  type="range"
+                  min={0}
+                  max={1}
+                  step={0.05}
+                  value={background.opacity}
+                  onChange={(e) => setBackground('opacity', Number(e.target.value))}
+                  className="w-full cursor-pointer accent-blue-400"
+                />
+              </Field>
+
+              <Field label={`Blur · ${background.blur}px`}>
+                <input
+                  type="range"
+                  min={0}
+                  max={60}
+                  value={background.blur}
+                  onChange={(e) => setBackground('blur', Number(e.target.value))}
+                  className="w-full cursor-pointer accent-blue-400"
+                />
+              </Field>
+
+              <Field label="Noise Pattern">
+                <Toggle checked={background.noisePattern} onChange={(checked) => setBackground('noisePattern', checked)} />
+              </Field>
+            </Section>
+          )}
+        </div>
+      </div>
+    </>
+  );
+}
+
+export { BackgroundPanelLegacy as BackgroundPanel };
+
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <section className="rounded-2xl border border-white/8 bg-white/[0.03] p-3">
@@ -696,8 +1133,7 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 
 function Toggle({ checked, onChange }: { checked: boolean; onChange: (checked: boolean) => void }) {
   return (
-    <button
-      type="button"
+    <button type="button"
       role="switch"
       aria-checked={checked}
       onClick={() => onChange(!checked)}

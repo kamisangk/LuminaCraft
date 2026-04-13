@@ -60,9 +60,10 @@ interface GithubPayload {
 
 const cache = new Map<string, CacheEntry>();
 const inflight = new Map<string, InflightEntry>();
-const CACHE_TTL_MS = 5 * 60 * 1000;
-const FETCH_TIMEOUT_MS = 8000;
+const CACHE_TTL_MS = 10 * 60 * 1000; // 延长缓存时间到10分钟
+const FETCH_TIMEOUT_MS = 15000; // 增加超时时间到15秒
 const MAX_REPO_LIMIT = 8;
+const STALE_CACHE_TTL_MS = 60 * 60 * 1000; // 过期缓存保留1小时用于降级
 
 const GITHUB_API_BASE = 'https://api.github.com';
 const GITHUB_ALLOWED_HOSTS = new Set(['api.github.com', 'github.com']);
@@ -77,11 +78,21 @@ function jsonError(message: string, status: number) {
 function getCached(cacheKey: string) {
   const cached = cache.get(cacheKey);
   if (!cached) return null;
-  if (Date.now() - cached.fetchedAt >= CACHE_TTL_MS) {
+  const age = Date.now() - cached.fetchedAt;
+
+  // 如果超过过期缓存时间，彻底删除
+  if (age >= STALE_CACHE_TTL_MS) {
     cache.delete(cacheKey);
     return null;
   }
-  return cached.data;
+
+  // 如果在正常缓存时间内，返回数据
+  if (age < CACHE_TTL_MS) {
+    return cached.data;
+  }
+
+  // 超过正常缓存时间但未超过过期时间，返回 null（但保留缓存用于降级）
+  return null;
 }
 
 function setCached(cacheKey: string, data: GithubPayload) {
@@ -89,7 +100,8 @@ function setCached(cacheKey: string, data: GithubPayload) {
 }
 
 function shouldCachePayload(data: GithubPayload) {
-  return data.heatmapError === null;
+  // 即使热力图失败，只要用户和仓库数据成功就缓存
+  return data.user && data.repos;
 }
 
 function getStaleCached(cacheKey: string) {
@@ -223,8 +235,21 @@ function parseGithubHeatmap(html: string): GithubHeatmap | null {
 }
 
 async function fetchGithubHeatmap(username: string): Promise<GithubHeatmap | null> {
-  const html = await fetchText(`${new URL(`/users/${encodeURIComponent(username)}/contributions`, `https://${CONTRIBUTIONS_HOST}`).toString()}`);
-  return parseGithubHeatmap(html);
+  try {
+    const html = await fetchText(`${new URL(`/users/${encodeURIComponent(username)}/contributions`, `https://${CONTRIBUTIONS_HOST}`).toString()}`);
+    const heatmap = parseGithubHeatmap(html);
+
+    // 验证热力图数据有效性
+    if (!heatmap || !heatmap.weeks || heatmap.weeks.length === 0) {
+      console.warn(`[fetchGithubHeatmap] Parsed heatmap is empty for user: ${username}`);
+      return null;
+    }
+
+    return heatmap;
+  } catch (error) {
+    console.error(`[fetchGithubHeatmap] Failed for user ${username}:`, error);
+    throw error;
+  }
 }
 
 function normalizeRepoLimit(value: string | null) {
@@ -234,20 +259,37 @@ function normalizeRepoLimit(value: string | null) {
 }
 
 async function getGithubPayload(username: string, repoLimit: number, showHeatmap: boolean): Promise<GithubPayload> {
-  const [user, repos, heatmapResult] = await Promise.all([
-    fetchJson<GithubUser>(`${GITHUB_API_BASE}/users/${encodeURIComponent(username)}`),
-    fetchJson<GithubRepo[]>(
-      `${GITHUB_API_BASE}/users/${encodeURIComponent(username)}/repos?sort=updated&per_page=${repoLimit}`
-    ),
-    showHeatmap
-      ? fetchGithubHeatmap(username)
-          .then((heatmap) => ({ heatmap, error: null as string | null }))
-          .catch((error: unknown) => ({
-            heatmap: null,
-            error: error instanceof Error ? error.message : 'Failed to fetch GitHub heatmap',
-          }))
-      : Promise.resolve({ heatmap: null, error: null as string | null }),
-  ]);
+  // 分离核心数据和热力图请求，避免热力图失败影响整体
+  let user: GithubUser;
+  let repos: GithubRepo[];
+
+  try {
+    [user, repos] = await Promise.all([
+      fetchJson<GithubUser>(`${GITHUB_API_BASE}/users/${encodeURIComponent(username)}`),
+      fetchJson<GithubRepo[]>(
+        `${GITHUB_API_BASE}/users/${encodeURIComponent(username)}/repos?sort=updated&per_page=${repoLimit}`
+      ),
+    ]);
+  } catch (error) {
+    console.error('[getGithubPayload] Failed to fetch user/repos:', error);
+    throw error;
+  }
+
+  // 热力图单独处理，失败不影响主数据
+  let heatmapResult: { heatmap: GithubHeatmap | null; error: string | null };
+
+  if (showHeatmap) {
+    try {
+      const heatmap = await fetchGithubHeatmap(username);
+      heatmapResult = { heatmap, error: null };
+    } catch (error: unknown) {
+      const errorMsg = error instanceof Error ? error.message : '热力图获取失败';
+      console.warn(`[getGithubPayload] Heatmap fetch failed for ${username}:`, errorMsg);
+      heatmapResult = { heatmap: null, error: errorMsg };
+    }
+  } else {
+    heatmapResult = { heatmap: null, error: null };
+  }
 
   return {
     user,
@@ -308,22 +350,34 @@ export async function GET(req: NextRequest) {
 
   try {
     const data = await request;
+
+    // 总是缓存成功的数据（即使热力图失败）
     if (shouldCachePayload(data)) {
       setCached(cacheKey, data);
     }
+
     return NextResponse.json(data, {
-      headers: { 'X-Cache': 'MISS' },
+      headers: {
+        'X-Cache': 'MISS',
+        'Cache-Control': 'public, max-age=300, stale-while-revalidate=600'
+      },
     });
   } catch (err) {
+    // 尝试使用过期缓存降级
     const stale = getStaleCached(cacheKey);
     if (stale) {
+      console.warn('[GET /api/proxy/v1] Using stale cache due to fetch error:', err);
       return NextResponse.json(stale, {
-        headers: { 'X-Cache': 'STALE' },
+        headers: {
+          'X-Cache': 'STALE',
+          'X-Stale-Reason': err instanceof Error ? err.message : 'Unknown error'
+        },
       });
     }
+
     console.error('[GET /api/proxy/v1] fetch error:', err);
-    const message = err instanceof Error ? err.message : 'Failed to fetch upstream';
-    const status = message === 'GitHub 用户不存在' ? 404 : 502;
+    const message = err instanceof Error ? err.message : 'GitHub 数据获取失败';
+    const status = message.includes('用户不存在') ? 404 : 502;
     return jsonError(message, status);
   } finally {
     inflight.delete(cacheKey);

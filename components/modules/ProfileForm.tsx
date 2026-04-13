@@ -45,6 +45,7 @@ export function ProfileForm({ module }: { module: ModuleInstance }) {
             链接
           </span>
           <button
+            type="button"
             onClick={addLink}
             className="rounded bg-blue-500/20 px-2 py-0.5 text-xs text-blue-300 transition-colors hover:bg-blue-500/40"
           >
@@ -67,6 +68,7 @@ export function ProfileForm({ module }: { module: ModuleInstance }) {
                 className="min-w-0"
               />
               <button
+                type="button"
                 onClick={() => removeLink(i)}
                 className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded text-red-400/70 transition-colors hover:bg-red-500/10 hover:text-red-400"
                 title="删除"

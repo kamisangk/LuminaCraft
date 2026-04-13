@@ -29,6 +29,7 @@
 
 # local project data
 /.docs/
+/docs/
 /temp/
 /data/config.json
 /data/auth.json

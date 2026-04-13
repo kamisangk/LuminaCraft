@@ -3,18 +3,19 @@
 import React, { useCallback, useMemo, useRef, useState } from 'react';
 import {
   useAppStore,
-  ModuleInstance,
   ModuleAppearance,
+  ModuleInstance,
+  ModuleThemePreset,
 } from '@/store/useAppStore';
-import { HTML_PRESETS } from './backgroundHtmlPresets';
 import { getModuleDefinition } from '@/lib/modules';
+import { HTML_PRESETS } from './backgroundHtmlPresets';
 import {
-  Section,
-  PanelBlock,
-  Field,
-  TextInput,
-  TextArea,
   ColorRow,
+  Field,
+  PanelBlock,
+  Section,
+  TextArea,
+  TextInput,
   Toggle,
   toHexSafe,
 } from './FormPrimitives';
@@ -33,7 +34,71 @@ const SHADOW_OPTIONS: { value: ModuleAppearance['shadow']; label: string }[] = [
   { value: 'soft', label: '柔和' },
   { value: 'medium', label: '标准' },
   { value: 'strong', label: '强烈' },
+  { value: 'none', label: '无' },
 ];
+const THEME_OPTIONS: { value: ModuleThemePreset; label: string }[] = [
+  { value: 'default', label: '默认' },
+  { value: 'liquid-glass', label: '液态玻璃' },
+  { value: 'custom', label: '自定义' },
+];
+
+export const CUSTOM_THEME_TEMPLATE = `/* 模块容器 / Module container */
+& {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+  background: linear-gradient(145deg, rgba(255,255,255,0.2), rgba(255,255,255,0.08));
+  border: 1px solid rgba(255,255,255,0.2);
+  border-radius: 24px;
+  box-shadow: 0 18px 48px rgba(15, 23, 42, 0.2);
+  backdrop-filter: blur(18px) saturate(145%);
+  -webkit-backdrop-filter: blur(18px) saturate(145%);
+  transition: transform 0.28s ease, box-shadow 0.28s ease, border-color 0.28s ease;
+}
+
+/* 悬停反馈 / Hover feedback */
+&:hover {
+  transform: translateY(-2px);
+  border-color: color-mix(in srgb, white 32%, var(--color-primary) 18%);
+  box-shadow: 0 24px 60px rgba(15, 23, 42, 0.24);
+}
+
+/* 液态高光层 / Liquid highlight layer */
+&::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 18% 16%, rgba(255,255,255,0.72), rgba(255,255,255,0) 30%),
+    linear-gradient(140deg, rgba(255,255,255,0.22), rgba(255,255,255,0.04));
+  filter: url(#liquid-glass-distort);
+}
+
+/* 内容层级 / Content layer */
+& > [data-module-content="true"] {
+  position: relative;
+  z-index: 1;
+}
+
+/* SVG 滤镜定义 / SVG filter definition */
+<svg width="0" height="0" viewBox="0 0 1 1" aria-hidden="true">
+  <filter id="liquid-glass-distort" x="-20%" y="-20%" width="140%" height="140%">
+    <feTurbulence type="fractalNoise" baseFrequency="0.012 0.02" numOctaves="2" seed="7" result="noise">
+      <animate attributeName="baseFrequency" values="0.012 0.02;0.016 0.024;0.012 0.02" dur="12s" repeatCount="indefinite" />
+    </feTurbulence>
+    <feDisplacementMap in="SourceGraphic" in2="noise" scale="10" xChannelSelector="R" yChannelSelector="G" />
+  </filter>
+</svg>`;
+
+export function getCustomThemeCssForPreset(themePreset: ModuleThemePreset, currentCustomCss: string): string | null {
+  if (themePreset !== 'custom' || currentCustomCss.trim()) {
+    return null;
+  }
+
+  return CUSTOM_THEME_TEMPLATE;
+}
 
 function JsonEditor({ module }: { module: ModuleInstance }) {
   const updateModuleProps = useAppStore((s) => s.updateModuleProps);
@@ -43,23 +108,55 @@ function JsonEditor({ module }: { module: ModuleInstance }) {
       const parsed = JSON.parse(raw) as ModuleInstance['props'];
       updateModuleProps(module.id, parsed);
     } catch {
-      // 忽略非法 JSON，等用户继续输入
+      // Ignore invalid JSON while typing.
     }
   };
 
   return (
-    <Field label="属性 (JSON)">
+    <Field label="属性（JSON）">
       <TextArea value={JSON.stringify(module.props, null, 2)} onChange={handleChange} rows={12} monospace />
+    </Field>
+  );
+}
+
+function ThemeSelector({
+  value,
+  onChange,
+}: {
+  value: ModuleThemePreset;
+  onChange: (value: ModuleThemePreset) => void;
+}) {
+  return (
+    <Field label="主题风格">
+      <div className="grid grid-cols-3 gap-1">
+        {THEME_OPTIONS.map((option) => (
+          <button
+            type="button"
+            key={option.value}
+            onClick={() => onChange(option.value)}
+            className={`rounded-lg py-1.5 text-[11px] font-medium transition-colors ${
+              value === option.value
+                ? 'bg-blue-500 text-white'
+                : 'bg-white/5 text-white/50 hover:bg-white/10 hover:text-white/80'
+            }`}
+          >
+            {option.label}
+          </button>
+        ))}
+      </div>
     </Field>
   );
 }
 
 function ModuleAppearanceForm({ module }: { module: ModuleInstance }) {
   const updateModuleAppearance = useAppStore((s) => s.updateModuleAppearance);
+  const updateModuleProps = useAppStore((s) => s.updateModuleProps);
   const appearance = module.appearance;
+  const customCss = typeof module.props.customCss === 'string' ? module.props.customCss : '';
   const definition = getModuleDefinition(module.type);
   const showColorSection = definition?.appearanceConfig.showColorSection ?? true;
   const showBackgroundSection = definition?.appearanceConfig.showBackgroundSection ?? true;
+  const showDetailedAppearance = appearance.themePreset === 'default';
   const [customHtml, setCustomHtml] = useState(
     appearance.background.type === 'html' ? appearance.background.value : ''
   );
@@ -72,8 +169,7 @@ function ModuleAppearanceForm({ module }: { module: ModuleInstance }) {
         : null,
     [appearance.background.type, appearance.background.value]
   );
-  const htmlSelectValue = matchedHtmlPreset?.name ?? HTML_CUSTOM_VALUE;
-  const isCustomHtmlSelected = htmlSelectValue === HTML_CUSTOM_VALUE;
+  const isCustomHtmlSelected = (matchedHtmlPreset?.name ?? HTML_CUSTOM_VALUE) === HTML_CUSTOM_VALUE;
   const backgroundUiType =
     appearance.background.type === 'image' || appearance.background.type === 'video'
       ? 'media'
@@ -116,6 +212,16 @@ function ModuleAppearanceForm({ module }: { module: ModuleInstance }) {
     (patch: Partial<ModuleAppearance>) => updateModuleAppearance(module.id, patch),
     [module.id, updateModuleAppearance]
   );
+  const handleThemePresetChange = useCallback(
+    (value: ModuleThemePreset) => {
+      setAppearance({ themePreset: value });
+      const nextCustomCss = getCustomThemeCssForPreset(value, customCss);
+      if (nextCustomCss !== null) {
+        updateModuleProps(module.id, { customCss: nextCustomCss });
+      }
+    },
+    [customCss, module.id, setAppearance, updateModuleProps]
+  );
 
   const setColor = (key: keyof ModuleAppearance['colors'], value: string) =>
     setAppearance({ colors: { ...appearance.colors, [key]: value } });
@@ -129,7 +235,7 @@ function ModuleAppearanceForm({ module }: { module: ModuleInstance }) {
       resolvedType === 'color'
         ? '#0d1117'
         : resolvedType === 'html'
-          ? customHtml
+          ? customHtml || HTML_PRESETS[0]?.html || ''
           : resolvedType === 'transparent'
             ? ''
             : appearance.background.type === resolvedType
@@ -154,13 +260,12 @@ function ModuleAppearanceForm({ module }: { module: ModuleInstance }) {
       background: {
         ...appearance.background,
         type,
-        value: appearance.background.type === 'image' || appearance.background.type === 'video' ? appearance.background.value : '',
+        value:
+          appearance.background.type === 'image' || appearance.background.type === 'video'
+            ? appearance.background.value
+            : '',
       },
     });
-  };
-
-  const applyPreset = (html: string) => {
-    setBackground('value', html);
   };
 
   const handleHtmlPresetSelect = (value: string) => {
@@ -169,23 +274,78 @@ function ModuleAppearanceForm({ module }: { module: ModuleInstance }) {
     if (value === HTML_CUSTOM_VALUE) {
       const nextValue = matchedHtmlPreset ? '' : customHtml;
       setCustomHtml(nextValue);
-      setBackground('value', nextValue);
+      setAppearance({
+        background: {
+          ...appearance.background,
+          type: 'html',
+          value: nextValue,
+        },
+      });
       return;
     }
 
     const preset = HTML_PRESETS.find((item) => item.name === value);
     if (preset) {
-      applyPreset(preset.html);
+      setAppearance({
+        background: {
+          ...appearance.background,
+          type: 'html',
+          value: preset.html,
+        },
+      });
     }
   };
 
   const handleCustomHtml = (value: string) => {
     setCustomHtml(value);
-    setBackground('value', value);
+    setAppearance({
+      background: {
+        ...appearance.background,
+        type: 'html',
+        value,
+      },
+    });
   };
+
+  if (!showDetailedAppearance) {
+    return (
+      <div className="flex flex-col gap-5">
+        <Section title="主题风格">
+          <ThemeSelector value={appearance.themePreset} onChange={handleThemePresetChange} />
+        </Section>
+
+        <Section title={appearance.themePreset === 'liquid-glass' ? '液态玻璃' : '自定义'}>
+          <p className="text-xs opacity-60" style={{ color: 'var(--color-text)' }}>
+            {appearance.themePreset === 'liquid-glass'
+              ? '当前模块会使用液态玻璃预设。'
+              : '当前模块会使用自定义主题，下面的 CSS 仅作用于当前模块。'}
+          </p>
+        </Section>
+
+        {appearance.themePreset === 'custom' && (
+          <Section title="模块自定义 CSS / SVG">
+            <TextArea
+              value={customCss}
+              onChange={(value) => updateModuleProps(module.id, { customCss: value })}
+              rows={8}
+              monospace
+              placeholder={CUSTOM_THEME_TEMPLATE}
+            />
+            <p className="text-[10px] opacity-30" style={{ color: 'var(--color-text)' }}>
+              支持纯 CSS、可选的 &lt;style&gt; 包裹，以及内联 &lt;svg&gt; 滤镜定义；不会执行脚本。
+            </p>
+          </Section>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col gap-5">
+      <Section title="主题风格">
+        <ThemeSelector value={appearance.themePreset} onChange={handleThemePresetChange} />
+      </Section>
+
       {showColorSection && (
         <Section title="颜色">
           <Field label="强调色">
@@ -204,237 +364,248 @@ function ModuleAppearanceForm({ module }: { module: ModuleInstance }) {
       )}
 
       {showBackgroundSection && (
-      <Section title="背景">
-        <Field label="背景类型">
-          <div className="grid grid-cols-3 gap-1">
-            {BG_TYPES.map((type) => (
+        <Section title="背景">
+          <Field label="背景类型">
+            <div className="grid grid-cols-3 gap-1">
+              {BG_TYPES.map((type) => (
+                <button
+                  type="button"
+                  key={type.value}
+                  onClick={() => setBgType(type.value)}
+                  className={`rounded-lg py-1.5 text-[11px] font-medium transition-colors ${
+                    backgroundUiType === type.value
+                      ? 'bg-blue-500 text-white'
+                      : 'bg-white/5 text-white/50 hover:bg-white/10 hover:text-white/80'
+                  }`}
+                >
+                  {type.label}
+                </button>
+              ))}
+            </div>
+          </Field>
+
+          {backgroundUiType === 'color' && (
+            <ColorRow
+              label="背景颜色"
+              value={toHexSafe(appearance.background.value)}
+              onChange={(v) => setBackground('value', v)}
+            />
+          )}
+
+          {backgroundUiType === 'media' && (
+            <>
+              <Field label="媒体类型">
+                <div className="grid grid-cols-2 gap-1">
+                  {MEDIA_KIND_OPTIONS.map((option) => (
+                    <button
+                      type="button"
+                      key={option.value}
+                      onClick={() => setMediaKind(option.value)}
+                      className={`rounded-lg py-1.5 text-[11px] font-medium transition-colors ${
+                        mediaKind === option.value
+                          ? 'bg-blue-500 text-white'
+                          : 'bg-white/5 text-white/50 hover:bg-white/10 hover:text-white/80'
+                      }`}
+                    >
+                      {option.label}
+                    </button>
+                  ))}
+                </div>
+              </Field>
+
+              <Field label={mediaKind === 'image' ? '图片 URL' : '视频 URL'}>
+                <TextInput
+                  value={appearance.background.value}
+                  onChange={(v) => setBackground('value', v)}
+                  placeholder={mediaKind === 'image' ? 'https://example.com/bg.jpg' : 'https://example.com/bg.mp4'}
+                />
+                {mediaKind === 'video' && (
+                  <p className="mt-1 text-[10px] opacity-30" style={{ color: 'var(--color-text)' }}>
+                    将作为模块背景视频循环播放，静音且不显示控制条。
+                  </p>
+                )}
+              </Field>
+
+              {mediaKind === 'image' && appearance.background.value && (
+                <div
+                  className="h-16 w-full rounded-lg border border-white/10 bg-cover bg-center"
+                  style={{ backgroundImage: `url(${appearance.background.value})` }}
+                />
+              )}
+            </>
+          )}
+
+          {appearance.background.type === 'html' && (
+            <>
+              <Field label="预设 / 自定义">
+                <div className="relative" ref={htmlPresetMenuRef}>
+                  <button
+                    type="button"
+                    onClick={() => setIsHtmlPresetMenuOpen((open) => !open)}
+                    aria-haspopup="listbox"
+                    aria-expanded={isHtmlPresetMenuOpen}
+                    className="flex w-full items-center justify-between rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm outline-none transition-colors hover:border-white/20 hover:bg-white/10 focus:border-blue-400/60 focus:ring-2 focus:ring-blue-400/20"
+                    style={{
+                      color: 'var(--color-text)',
+                      boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.04), 0 8px 24px rgba(0,0,0,0.18)',
+                    }}
+                  >
+                    <span className="truncate text-left">{matchedHtmlPreset?.name ?? '自定义'}</span>
+                    <svg
+                      viewBox="0 0 20 20"
+                      className={`h-4 w-4 flex-shrink-0 fill-current text-white/45 transition-transform duration-200 ${
+                        isHtmlPresetMenuOpen ? 'rotate-180' : ''
+                      }`}
+                      aria-hidden="true"
+                    >
+                      <path
+                        fillRule="evenodd"
+                        d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.51a.75.75 0 01-1.08 0l-4.25-4.51a.75.75 0 01.02-1.06z"
+                        clipRule="evenodd"
+                      />
+                    </svg>
+                  </button>
+                  {isHtmlPresetMenuOpen && (
+                    <div
+                      className="absolute left-0 right-0 top-[calc(100%+0.375rem)] z-20 overflow-hidden rounded-lg border border-white/10 bg-[#0d1117]/95 p-1 shadow-xl backdrop-blur-sm"
+                      style={{ boxShadow: '0 16px 40px rgba(0,0,0,0.28)' }}
+                    >
+                      <div className="mb-1 rounded-xl border border-blue-400/15 bg-blue-500/8 p-1">
+                        <button
+                          type="button"
+                          onClick={() => handleHtmlPresetSelect(HTML_CUSTOM_VALUE)}
+                          className={`flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm transition-colors ${
+                            isCustomHtmlSelected
+                              ? 'bg-blue-500/20 text-blue-200'
+                              : 'text-white/80 hover:bg-white/6 hover:text-white'
+                          }`}
+                        >
+                          <span>自定义</span>
+                          {isCustomHtmlSelected && <span className="text-[11px] text-blue-300/80">当前</span>}
+                        </button>
+                      </div>
+                      <div className="mx-2 mb-1 flex items-center gap-2 px-1">
+                        <div className="h-px flex-1 bg-white/10" />
+                        <span className="text-[10px] uppercase tracking-[0.24em] text-white/30">Presets</span>
+                        <div className="h-px flex-1 bg-white/10" />
+                      </div>
+                      <div className="max-h-64 overflow-y-auto rounded-xl bg-white/[0.02] p-1">
+                        {HTML_PRESETS.map((preset) => {
+                          const active = matchedHtmlPreset?.name === preset.name;
+                          return (
+                            <button
+                              type="button"
+                              key={preset.name}
+                              onClick={() => handleHtmlPresetSelect(preset.name)}
+                              className={`flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm transition-colors ${
+                                active
+                                  ? 'bg-blue-500/18 text-blue-200'
+                                  : 'text-white/75 hover:bg-white/6 hover:text-white'
+                              }`}
+                            >
+                              <span>{preset.name}</span>
+                              {active && <span className="text-[11px] text-blue-300/80">当前</span>}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </Field>
+
+              {isCustomHtmlSelected && (
+                <Field label="自定义 HTML 代码">
+                  <TextArea
+                    value={customHtml}
+                    onChange={handleCustomHtml}
+                    rows={8}
+                    monospace
+                    placeholder="<!DOCTYPE html><html>...</html>"
+                  />
+                  <p className="text-[10px] opacity-30" style={{ color: 'var(--color-text)' }}>
+                    会在 iframe sandbox 中运行，仅允许脚本执行，无法访问父页面。
+                  </p>
+                </Field>
+              )}
+            </>
+          )}
+
+          <Field label={`背景透明度 · ${Math.round(appearance.background.opacity * 100)}%`}>
+            <input
+              type="range"
+              min={0}
+              max={1}
+              step={0.05}
+              value={appearance.background.opacity}
+              onChange={(e) => setBackground('opacity', Number(e.target.value))}
+              className="w-full cursor-pointer accent-blue-400"
+            />
+          </Field>
+
+          <Field label={`毛玻璃模糊度 · ${appearance.background.blur}px`}>
+            <input
+              type="range"
+              min={0}
+              max={60}
+              value={appearance.background.blur}
+              onChange={(e) => setBackground('blur', Number(e.target.value))}
+              className="w-full cursor-pointer accent-blue-400"
+            />
+          </Field>
+
+          <Field label="噪点遮罩">
+            <Toggle checked={appearance.background.noisePattern} onChange={(checked) => setBackground('noisePattern', checked)} />
+          </Field>
+        </Section>
+      )}
+
+      <Section title="形状与密度">
+        <Field label={`圆角 · ${appearance.borderRadius}px`}>
+          <input
+            type="range"
+            min={0}
+            max={32}
+            value={appearance.borderRadius}
+            onChange={(e) => setAppearance({ borderRadius: Number(e.target.value) })}
+            className="w-full cursor-pointer accent-blue-400"
+          />
+        </Field>
+
+        <Field label={`内边距 · ${appearance.padding}px`}>
+          <input
+            type="range"
+            min={0}
+            max={40}
+            value={appearance.padding}
+            onChange={(e) => setAppearance({ padding: Number(e.target.value) })}
+            className="w-full cursor-pointer accent-blue-400"
+          />
+        </Field>
+
+        <Field label="阴影强度">
+          <div className="grid grid-cols-4 gap-1">
+            {SHADOW_OPTIONS.map((option) => (
               <button
-                key={type.value}
-                onClick={() => setBgType(type.value)}
+                type="button"
+                key={option.value}
+                onClick={() => setAppearance({ shadow: option.value })}
                 className={`rounded-lg py-1.5 text-[11px] font-medium transition-colors ${
-                  backgroundUiType === type.value
+                  appearance.shadow === option.value
                     ? 'bg-blue-500 text-white'
                     : 'bg-white/5 text-white/50 hover:bg-white/10 hover:text-white/80'
                 }`}
               >
-                {type.label}
+                {option.label}
               </button>
             ))}
           </div>
         </Field>
 
-        {backgroundUiType === 'color' && (
-          <ColorRow
-            label="背景颜色"
-            value={toHexSafe(appearance.background.value)}
-            onChange={(v) => setBackground('value', v)}
-          />
-        )}
-
-        {backgroundUiType === 'media' && (
-          <>
-            <Field label="媒体类型">
-              <div className="grid grid-cols-2 gap-1">
-                {MEDIA_KIND_OPTIONS.map((option) => (
-                  <button
-                    key={option.value}
-                    type="button"
-                    onClick={() => setMediaKind(option.value)}
-                    className={`rounded-lg py-1.5 text-[11px] font-medium transition-colors ${
-                      mediaKind === option.value
-                        ? 'bg-blue-500 text-white'
-                        : 'bg-white/5 text-white/50 hover:bg-white/10 hover:text-white/80'
-                    }`}
-                  >
-                    {option.label}
-                  </button>
-                ))}
-              </div>
-            </Field>
-
-            <Field label={mediaKind === 'image' ? '图片 URL' : '视频 URL'}>
-              <TextInput
-                value={appearance.background.value}
-                onChange={(v) => setBackground('value', v)}
-                placeholder={mediaKind === 'image' ? 'https://example.com/bg.jpg' : 'https://example.com/bg.mp4'}
-              />
-              {mediaKind === 'video' && (
-                <p className="mt-1 text-[10px] opacity-30" style={{ color: 'var(--color-text)' }}>
-                  作为模块背景视频循环播放，静音且不显示控件。
-                </p>
-              )}
-            </Field>
-
-            {mediaKind === 'image' && appearance.background.value && (
-              <div
-                className="h-16 w-full rounded-lg border border-white/10 bg-cover bg-center"
-                style={{ backgroundImage: `url(${appearance.background.value})` }}
-              />
-            )}
-          </>
-        )}
-
-        {appearance.background.type === 'html' && (
-          <>
-            <Field label="预设 / 自定义">
-              <div className="relative" ref={htmlPresetMenuRef}>
-                <button
-                  type="button"
-                  onClick={() => setIsHtmlPresetMenuOpen((open) => !open)}
-                  aria-haspopup="listbox"
-                  aria-expanded={isHtmlPresetMenuOpen}
-                  className="flex w-full items-center justify-between rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm outline-none transition-colors hover:border-white/20 hover:bg-white/10 focus:border-blue-400/60 focus:ring-2 focus:ring-blue-400/20"
-                  style={{ color: 'var(--color-text)', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.04), 0 8px 24px rgba(0,0,0,0.18)' }}
-                >
-                  <span className="truncate text-left">{matchedHtmlPreset?.name ?? '自定义'}</span>
-                  <svg
-                    viewBox="0 0 20 20"
-                    className={`h-4 w-4 flex-shrink-0 fill-current text-white/45 transition-transform duration-200 ${isHtmlPresetMenuOpen ? 'rotate-180' : ''}`}
-                    aria-hidden="true"
-                  >
-                    <path
-                      fillRule="evenodd"
-                      d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.51a.75.75 0 01-1.08 0l-4.25-4.51a.75.75 0 01.02-1.06z"
-                      clipRule="evenodd"
-                    />
-                  </svg>
-                </button>
-                {isHtmlPresetMenuOpen && (
-                  <div
-                    className="absolute left-0 right-0 top-[calc(100%+0.375rem)] z-20 overflow-hidden rounded-lg border border-white/10 bg-[#0d1117]/95 p-1 shadow-xl backdrop-blur-sm"
-                    style={{ boxShadow: '0 16px 40px rgba(0,0,0,0.28)' }}
-                  >
-                    <div className="mb-1 rounded-xl border border-blue-400/15 bg-blue-500/8 p-1">
-                      <button
-                        type="button"
-                        onClick={() => handleHtmlPresetSelect(HTML_CUSTOM_VALUE)}
-                        className={`flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm transition-colors ${
-                          isCustomHtmlSelected
-                            ? 'bg-blue-500/20 text-blue-200'
-                            : 'text-white/80 hover:bg-white/6 hover:text-white'
-                        }`}
-                      >
-                        <span>自定义</span>
-                        {isCustomHtmlSelected && <span className="text-[11px] text-blue-300/80">当前</span>}
-                      </button>
-                    </div>
-                    <div className="mx-2 mb-1 flex items-center gap-2 px-1">
-                      <div className="h-px flex-1 bg-white/10" />
-                      <span className="text-[10px] uppercase tracking-[0.24em] text-white/30">Presets</span>
-                      <div className="h-px flex-1 bg-white/10" />
-                    </div>
-                    <div className="max-h-64 overflow-y-auto rounded-xl bg-white/[0.02] p-1">
-                      {HTML_PRESETS.map((preset) => {
-                        const active = matchedHtmlPreset?.name === preset.name;
-                        return (
-                          <button
-                            key={preset.name}
-                            type="button"
-                            onClick={() => handleHtmlPresetSelect(preset.name)}
-                            className={`flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm transition-colors ${
-                              active
-                                ? 'bg-blue-500/18 text-blue-200'
-                                : 'text-white/75 hover:bg-white/6 hover:text-white'
-                            }`}
-                          >
-                            <span>{preset.name}</span>
-                            {active && <span className="text-[11px] text-blue-300/80">当前</span>}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
-              </div>
-            </Field>
-            {isCustomHtmlSelected && (
-              <Field label="自定义 HTML 代码">
-                <TextArea
-                  value={customHtml}
-                  onChange={handleCustomHtml}
-                  rows={8}
-                  monospace
-                  placeholder="<!DOCTYPE html><html>...</html>"
-                />
-                <p className="text-[10px] opacity-30" style={{ color: 'var(--color-text)' }}>
-                  在 iframe sandbox 中运行，仅允许脚本执行，无法访问父页面
-                </p>
-              </Field>
-            )}
-          </>
-        )}
-
-        <Field label={`背景透明度 · ${Math.round(appearance.background.opacity * 100)}%`}>
-          <input
-            type="range"
-            min={0}
-            max={1}
-            step={0.05}
-            value={appearance.background.opacity}
-            onChange={(e) => setBackground('opacity', Number(e.target.value))}
-            className="w-full cursor-pointer accent-blue-400"
-          />
-        </Field>
-
-        <Field label={`毛玻璃模糊度 · ${appearance.background.blur}px`}>
-          <input
-            type="range"
-            min={0}
-            max={60}
-            value={appearance.background.blur}
-            onChange={(e) => setBackground('blur', Number(e.target.value))}
-            className="w-full cursor-pointer accent-blue-400"
-          />
-        </Field>
-
-        <Field label="噪点遮罩">
-          <Toggle checked={appearance.background.noisePattern} onChange={(checked) => setBackground('noisePattern', checked)} />
+        <Field label="显示边框">
+          <Toggle checked={appearance.showBorder ?? true} onChange={(checked) => setAppearance({ showBorder: checked })} />
         </Field>
       </Section>
-      )}
-
-      <Section title="形状与密度">
-          <Field label={`圆角 · ${appearance.borderRadius}px`}>
-            <input
-              type="range"
-              min={0}
-              max={32}
-              value={appearance.borderRadius}
-              onChange={(e) => setAppearance({ borderRadius: Number(e.target.value) })}
-              className="w-full cursor-pointer accent-blue-400"
-            />
-          </Field>
-
-          <Field label={`内边距 · ${appearance.padding}px`}>
-            <input
-              type="range"
-              min={0}
-              max={40}
-              value={appearance.padding}
-              onChange={(e) => setAppearance({ padding: Number(e.target.value) })}
-              className="w-full cursor-pointer accent-blue-400"
-            />
-          </Field>
-
-          <Field label="阴影强度">
-            <div className="grid grid-cols-3 gap-1">
-              {SHADOW_OPTIONS.map((option) => (
-                <button
-                  key={option.value}
-                  onClick={() => setAppearance({ shadow: option.value })}
-                  className={`rounded-lg py-1.5 text-[11px] font-medium transition-colors ${
-                    appearance.shadow === option.value
-                      ? 'bg-blue-500 text-white'
-                      : 'bg-white/5 text-white/50 hover:bg-white/10 hover:text-white/80'
-                  }`}
-                >
-                  {option.label}
-                </button>
-              ))}
-            </div>
-          </Field>
-        </Section>
-
     </div>
   );
 }
@@ -443,33 +614,33 @@ function ContentForm({ module }: { module: ModuleInstance }) {
   const definition = getModuleDefinition(module.type);
   if (definition) {
     const Form = definition.ConfigForm;
-    return <Form module={module} />;
+    return (
+      <React.Suspense
+        fallback={
+          <div
+            className="rounded-xl border border-white/10 bg-white/5 px-3 py-4 text-sm opacity-70"
+            style={{ color: 'var(--color-text)' }}
+          >
+            配置表单加载中...
+          </div>
+        }
+      >
+        <Form module={module} />
+      </React.Suspense>
+    );
   }
   return <JsonEditor module={module} />;
 }
 
-function FormForModule({ module }: { module: ModuleInstance }) {
-  const customCss = typeof module.props.customCss === 'string' ? module.props.customCss : '';
-  const updateModuleProps = useAppStore((s) => s.updateModuleProps);
-
+export function FormForModule({ module }: { module: ModuleInstance }) {
   return (
     <div className="flex flex-col gap-4">
       <PanelBlock title="内容配置" description="编辑当前模块的业务内容。">
         <ContentForm module={module} />
       </PanelBlock>
 
-      <PanelBlock title="外观配置" description="当前模块独立生效，不影响其他模块。">
+      <PanelBlock title="外观配置" description="仅作用于当前模块，不影响其他模块。">
         <ModuleAppearanceForm module={module} />
-      </PanelBlock>
-
-      <PanelBlock title="模块自定义 CSS" description="仅作用于当前模块。普通选择器会自动加上模块作用域；如需定位根节点，可用 & 占位。">
-        <TextArea
-          value={customCss}
-          onChange={(value) => updateModuleProps(module.id, { customCss: value })}
-          rows={8}
-          monospace
-          placeholder={".title { color: #58a6ff; }\n& img { border-radius: 24px; }"}
-        />
       </PanelBlock>
     </div>
   );
@@ -480,7 +651,7 @@ export function ModuleConfigPanel() {
   const closeModulePanel = useAppStore((s) => s.closeModulePanel);
   const modules = useAppStore((s) => s.pageConfig.modules);
 
-  const module = modules.find((m) => m.id === activePanelModuleId) ?? null;
+  const module = modules.find((item) => item.id === activePanelModuleId) ?? null;
   const isOpen = module !== null;
 
   return (
@@ -498,7 +669,10 @@ export function ModuleConfigPanel() {
           boxShadow: isOpen ? '-8px 0 40px rgba(0,0,0,0.5)' : 'none',
         }}
       >
-        <div className="flex items-center justify-between border-b px-4 py-3" style={{ borderColor: 'rgba(255,255,255,0.08)' }}>
+        <div
+          className="flex items-center justify-between border-b px-4 py-3"
+          style={{ borderColor: 'rgba(255,255,255,0.08)' }}
+        >
           <div>
             <p className="text-xs opacity-40" style={{ color: 'var(--color-text)' }}>
               模块配置
@@ -508,6 +682,7 @@ export function ModuleConfigPanel() {
             </h3>
           </div>
           <button
+            type="button"
             onClick={closeModulePanel}
             className="flex h-8 w-8 items-center justify-center rounded-lg text-white/40 transition-colors hover:bg-white/5 hover:text-white/80"
             aria-label="关闭"

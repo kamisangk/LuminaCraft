@@ -160,6 +160,31 @@ export function Toggle({ checked, onChange }: { checked: boolean; onChange: (che
   );
 }
 
+export function Select({
+  value,
+  onChange,
+  options,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  options: { label: string; value: string }[];
+}) {
+  return (
+    <select
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      className={`${inputBase} cursor-pointer`}
+      style={{ color: 'var(--color-text)' }}
+    >
+      {options.map((option) => (
+        <option key={option.value} value={option.value}>
+          {option.label}
+        </option>
+      ))}
+    </select>
+  );
+}
+
 export function toHexSafe(color: string): string {
   if (/^#[0-9a-f]{6}$/i.test(color)) return color;
 
